@@ -42,6 +42,18 @@ gpu = [
     "sentencepiece>=0.2.0",
     "protobuf",
 ]
+# ── 指標 ────────────────────────────────────────────────────
+# CLIPScore：無參考的圖文對齊指標。只要 torch + transformers，CPU 也能跑，
+# 所以刻意跟 gpu 分開——評分可以在沒有顯卡的機器上做。
+clip = [
+    "torch>=2.4",
+    "transformers==4.57.3",
+]
+# LLM-as-judge：唯一能量到幻覺的指標。需要 ANTHROPIC_API_KEY。
+judge = [
+    "anthropic>=0.40",
+]
+# BLEU/ROUGE：預設不啟用，留著跟原始 notebook 對照用。
 eval = [
     "evaluate>=0.4.3",
     "rouge_score>=0.1.2",

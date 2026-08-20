@@ -1,4 +1,4 @@
-"""Evaluation on a held-out split.
+"""Generate predictions on a held-out split, then score them.
 
 Three things the original notebook got wrong and this module does not:
 
@@ -8,8 +8,9 @@ Three things the original notebook got wrong and this module does not:
   echoed prompt;
 * it decodes greedily by default, so a re-run reproduces the number.
 
-It also reports a bootstrap confidence interval, because ~25 held-out captions
-cannot support a point estimate quoted to three decimals.
+Predictions are written to disk *before* any metric runs. Scoring can fail -
+an API key expires, a CLIP download times out - and when it does you should not
+have to spend GPU time regenerating. `make score` picks up from the file.
 """
 
 from __future__ import annotations
@@ -22,8 +23,7 @@ from omegaconf import DictConfig
 
 from src.config import config_from_args, ensure_dirs
 from src.data.split import load_manifest, load_split
-
-BOOTSTRAP_PERCENTILES = (2.5, 97.5)
+from src.models.score import predictions_path, print_summary, score
 
 
 def check_split_consistency(cfg: DictConfig) -> dict[str, Any]:
@@ -93,66 +93,26 @@ def generate_predictions(cfg: DictConfig, records: list[dict], loaded: Any) -> l
     return rows
 
 
-def compute_metrics(
-    predictions: list[str],
-    references: list[str],
-    bootstrap_samples: int = 1000,
-    bootstrap_seed: int = 0,
-) -> dict[str, Any]:
-    """Corpus BLEU and per-sample ROUGE, each with a bootstrap 95% interval."""
-    import numpy as np
-    from evaluate import load
+def write_predictions(cfg: DictConfig, rows: list[dict], split: str) -> Path:
+    path = predictions_path(cfg, split)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"[eval] wrote {path} ({len(rows)} predictions)")
+    return path
 
-    if not predictions:
-        raise ValueError("no predictions to score")
 
-    non_empty = sum(1 for p in predictions if p.strip())
-    bleu_metric = load("bleu")
-    rouge_metric = load("rouge")
+def release_model(loaded: Any) -> None:
+    """Free the VLM before scoring so CLIP can have the GPU."""
+    import gc
 
-    def corpus_bleu(preds: list[str], refs: list[str]) -> float:
-        # BLEU is undefined without at least one non-empty hypothesis
-        if not any(p.strip() for p in preds):
-            return 0.0
-        try:
-            return float(
-                bleu_metric.compute(predictions=preds, references=[[r] for r in refs])["bleu"]
-            )
-        except ZeroDivisionError:
-            return 0.0
+    import torch
 
-    bleu_point = corpus_bleu(predictions, references)
-    per_sample_rouge = rouge_metric.compute(
-        predictions=predictions, references=references, use_aggregator=False
-    )
-    rouge_arrays = {key: np.asarray(values, dtype=float) for key, values in per_sample_rouge.items()}
-
-    rng = np.random.default_rng(bootstrap_seed)
-    n = len(predictions)
-    bleu_draws: list[float] = []
-    rouge_draws: dict[str, list[float]] = {key: [] for key in rouge_arrays}
-
-    for draw in range(int(bootstrap_samples)):
-        idx = rng.integers(0, n, size=n)
-        bleu_draws.append(corpus_bleu([predictions[i] for i in idx], [references[i] for i in idx]))
-        for key, values in rouge_arrays.items():
-            rouge_draws[key].append(float(values[idx].mean()))
-        if bootstrap_samples >= 200 and (draw + 1) % 200 == 0:
-            print(f"  bootstrap {draw + 1}/{bootstrap_samples}")
-
-    def interval(draws: list[float]) -> list[float]:
-        low, high = np.percentile(draws, BOOTSTRAP_PERCENTILES)
-        return [round(float(low), 4), round(float(high), 4)]
-
-    return {
-        "n_samples": n,
-        "n_non_empty_predictions": non_empty,
-        "bleu": round(bleu_point, 4),
-        "bleu_ci95": interval(bleu_draws),
-        **{key: round(float(values.mean()), 4) for key, values in rouge_arrays.items()},
-        **{f"{key}_ci95": interval(draws) for key, draws in rouge_draws.items()},
-        "bootstrap_samples": int(bootstrap_samples),
-    }
+    loaded.model = None
+    loaded.tokenizer = None
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def main(cfg: DictConfig) -> dict[str, Any]:
@@ -168,43 +128,27 @@ def main(cfg: DictConfig) -> dict[str, Any]:
     if not loaded.has_adapter:
         print("[eval] WARNING: scoring the BASE model - no LoRA weights were found")
 
-    rows = generate_predictions(cfg, records, loaded)
-    metrics = compute_metrics(
-        [r["prediction"] for r in rows],
-        [r["reference"] for r in rows],
-        bootstrap_samples=int(cfg.eval.bootstrap_samples),
-        bootstrap_seed=int(cfg.eval.bootstrap_seed),
-    )
-
-    report = {
-        "split": split_name,
+    context = {
+        "base_id": str(cfg.model.base_id),
+        "adapter": loaded.describe(),
         "decoding": {
             "max_new_tokens": int(cfg.eval.max_new_tokens),
             "do_sample": bool(cfg.eval.do_sample),
             "temperature": cfg.eval.get("temperature"),
             "top_p": cfg.eval.get("top_p"),
         },
-        "adapter": loaded.describe(),
         **provenance,
-        "metrics": metrics,
     }
 
-    reports_dir = Path(cfg.paths.reports_dir)
-    (reports_dir / f"eval_{split_name}.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    rows = generate_predictions(cfg, records, loaded)
     if bool(cfg.eval.save_predictions):
-        with (reports_dir / f"predictions_{split_name}.jsonl").open("w", encoding="utf-8") as fh:
-            for row in rows:
-                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        write_predictions(cfg, rows, split_name)
+    release_model(loaded)
 
-    print(json.dumps(metrics, ensure_ascii=False, indent=2))
-    print(
-        f"\nn={metrics['n_samples']} held-out captions. Read the CI, not the point "
-        "estimate - see MODEL_CARD.md."
-    )
+    report = score(cfg, rows, split_name, context)
+    print_summary(report)
     return report
 
 
 if __name__ == "__main__":
-    main(config_from_args("evaluate on a held-out split"))
+    main(config_from_args("generate predictions on a held-out split, then score them"))

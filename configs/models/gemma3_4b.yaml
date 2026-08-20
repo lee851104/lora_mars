@@ -1,0 +1,20 @@
+# Gemma 3 4B（it）。unsloth 鏡像沒有 gated，Google 官方 repo 需要手動申請核准。
+# 4-bit 權重 4.25 GiB，是這幾個預設裡最小的多模態選項。
+#
+# T4 上的 float16 問題：Gemma 3 用 bf16 訓練，activation 會超過 float16 上限
+# 65504，而 T4（compute 7.5）沒有 bf16 硬體。unsloth 針對這件事做了處理——
+# activation 走 bf16/fp32、matmul 才降到 fp16、layernorm 升到 fp32，並自動選型。
+# 所以可以跑，但這是三個預設裡最需要注意數值穩定性的一個：loss 出現 nan 就先
+# 降 learning_rate，並確認 unsloth 是最新版。
+#
+# 視覺是 SigLIP 固定 896x896（每張圖固定 256 個 token），沒有動態解析度可調。
+model:
+  base_id: unsloth/gemma-3-4b-it-unsloth-bnb-4bit
+  min_free_vram_gb: 5.5
+  image_max_pixels: null
+  license_notice: >-
+    基礎模型 Gemma 3 4B IT，使用受 Google Gemma Terms of Use 與
+    Prohibited Use Policy 約束；再散布時必須一併傳遞這些使用限制。
+train:
+  # Gemma 3 在 fp16 下數值比較敏感，學習率保守一點
+  learning_rate: 1.0e-4

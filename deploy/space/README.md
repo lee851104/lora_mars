@@ -9,12 +9,12 @@ app_file: app.py
 pinned: false
 license: other
 suggested_hardware: t4-small
-short_description: Qwen2.5-VL + LoRA，天文影像描述，附微調前後對照
+short_description: Gemma 3 4B + LoRA，天文影像描述，附微調前後對照
 ---
 
 # 🔭 天文影像描述 · LoRA Demo
 
-用 LoRA 在 250 張天文照片上微調 **Qwen2.5-VL-7B-Instruct**，上傳圖片就會得到一段英文描述。
+用 LoRA 在 250 張天文照片上微調 **Gemma 3 4B IT**，上傳圖片就會得到一段英文描述。
 介面可以同時顯示**微調前**與**微調後**的輸出——兩者是同一個模型，只差有沒有掛上 LoRA adapter，
 所以差異就是微調的效果。
 
@@ -22,11 +22,11 @@ short_description: Qwen2.5-VL + LoRA，天文影像描述，附微調前後對�
 
 | 項目 | 值 |
 |---|---|
-| Hardware | **T4 small 或更好**（4-bit 量化後約需 6.5 GB VRAM） |
+| Hardware | **T4 small 或更好**（4-bit 量化後約需 4.5 GB VRAM） |
 | Space variable | `LORA_REPO_ID` = `<user>/<adapter-repo>` |
 
 **免費的 CPU basic 硬體跑不動這個模型**，一定要換 GPU。ZeroGPU 可行但需要 PRO 訂閱，
-而且每次呼叫都要重新把 6.4 GB 權重搬上 GPU，第一次會很慢。
+而且每次呼叫都要重新把 4.3 GB 權重搬上 GPU，第一次會很慢。
 
 `LORA_REPO_ID` 沒設的話，介面會明確標示「現在跑的是原廠模型」，不會假裝是微調結果。
 
@@ -38,12 +38,13 @@ short_description: Qwen2.5-VL + LoRA，天文影像描述，附微調前後對�
 
 ## 授權
 
-基礎模型 **Qwen2.5-VL-7B-Instruct** 採 [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)：
-不需接受額外條款、沒有地域限制、可商用。
+基礎模型 **Gemma 3 4B IT** 使用受 [Google Gemma Terms of Use](https://ai.google.dev/gemma/terms)
+與 [Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy) 約束；
+再散布時必須一併傳遞這些使用限制。
 
-> 如果你把 `MODEL` 換成 `llama3_2_11b_vision`，授權義務也跟著換——必須顯示
-> **"Built with Llama"**，而且 Llama 3.2 的視覺功能在歐盟境內的自然人或法人不得使用。
-> 介面的「說明」分頁會依設定自動顯示對應的授權文字。
+> 換模型就換授權義務：`qwen2_5_vl_7b` 是 Apache 2.0（無額外條款、無地域限制）；
+> `llama3_2_11b_vision` 必須顯示 **"Built with Llama"**，而且 Llama 3.2 的視覺功能
+> 在歐盟境內的自然人或法人不得使用。介面的「說明」分頁會依設定自動顯示對應的授權文字。
 
 ## 原始碼
 

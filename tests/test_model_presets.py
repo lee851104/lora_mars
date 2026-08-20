@@ -36,11 +36,19 @@ def test_preset_loads_and_is_complete(preset):
     assert "image_max_pixels" in cfg.model
 
 
-def test_default_config_uses_an_apache_licensed_model():
-    """The default must not require accepting a licence or carry a region ban."""
+def test_default_model_is_ungated_and_unrestricted_by_region():
+    """The invariant is not "is Qwen" - it is that a fresh clone can just run.
+
+    The default must not require clicking through a licence on the Hub, and must
+    not carry a geographic restriction. That rules out the Llama preset, whose
+    vision capabilities are barred for entities domiciled in the EU.
+    """
     cfg = load_config()
-    assert "Qwen" in cfg.model.base_id
-    assert "Apache" in cfg.model.license_notice
+    notice = cfg.model.license_notice
+
+    assert cfg.model.base_id.startswith("unsloth/"), "use the ungated unsloth mirror"
+    assert "Built with Llama" not in notice
+    assert "歐盟" not in notice, "the default must not carry a region restriction"
 
 
 def test_llama_preset_carries_the_required_attribution():

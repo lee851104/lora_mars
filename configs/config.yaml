@@ -36,19 +36,23 @@ split:
   stratify_by: label      # null 可關閉分層抽樣
 
 model:
-  # 預設 Qwen2.5-VL-7B：Apache 2.0、不需接受授權、無地域限制、4-bit 6.43 GiB。
-  # 換模型用 `make train MODEL=qwen2_vl_2b`，可選的預設見 configs/models/README.md。
-  base_id: unsloth/Qwen2.5-VL-7B-Instruct-unsloth-bnb-4bit
+  # 預設 Gemma 3 4B IT：4-bit 只有 4.25 GiB、unsloth 鏡像沒有 gated。
+  # 換模型用 `make train MODEL=qwen2_5_vl_7b`，可選的預設見 configs/models/README.md。
+  # Gemma 3 在 T4（無 bf16）上的數值注意事項寫在 configs/models/gemma3_4b.yaml。
+  base_id: unsloth/gemma-3-4b-it-unsloth-bnb-4bit
   load_in_4bit: true
   use_gradient_checkpointing: unsloth
   max_seq_length: 2048
   local_files_only: false
-  min_free_vram_gb: 7.5   # 低於此值就拒絕載入，並提示重啟（避免殘留顯存造成的 OOM）
-  # Qwen2-VL 系列是動態解析度：處理器預設上限 12.8M 像素，一張大圖就能產生上萬個
-  # vision token，在 T4 上必爆。夾到 768x768（約 750 個 token）。
-  # null = 不動處理器預設（mllama 這種固定 tiling 的架構就設 null）。
-  image_max_pixels: 589824
-  license_notice: "基礎模型 Qwen2.5-VL-7B-Instruct，採 Apache 2.0 授權。"
+  min_free_vram_gb: 5.5   # 低於此值就拒絕載入，並提示重啟（避免殘留顯存造成的 OOM）
+  # 動態解析度的架構（Qwen2-VL 系列）處理器預設上限 12.8M 像素，一張大圖就能產生
+  # 上萬個 vision token，在 T4 上必爆，所以那些預設會夾到 768x768（約 750 個 token）。
+  # null = 不動處理器預設。Gemma 3 是 SigLIP 固定 896x896、mllama 是固定 tiling，
+  # 兩者都沒有這個旋鈕，設 null。
+  image_max_pixels: null
+  license_notice: >-
+    基礎模型 Gemma 3 4B IT，使用受 Google Gemma Terms of Use 與
+    Prohibited Use Policy 約束；再散布時必須一併傳遞這些使用限制。
 
 lora:
   r: 16
@@ -96,9 +100,42 @@ eval:
   do_sample: false
   temperature: null
   top_p: null
+  save_predictions: true     # score 階段要讀這個檔，關掉就只能一次跑完
+
+  # 要算哪些指標。可選：clipscore / llm_judge / bleu_rouge
+  # BLEU/ROUGE 留著是為了跟原始 notebook 對照，但它們量不到事實正確性——
+  # 一個把星系名稱全講錯、句型卻一致的輸出可以拿到很高的分數，所以不是預設。
+  metrics: [clipscore, llm_judge]
+
   bootstrap_samples: 1000
   bootstrap_seed: 0
-  save_predictions: true
+
+clipscore:
+  # 無參考指標：直接量「圖片」與「生成描述」在 CLIP 空間的餘弦相似度，
+  # 不看參考句子，所以量的是圖文對齊而不是字面重疊。
+  model_id: openai/clip-vit-large-patch14
+  device: auto               # auto | cpu | cuda（VLM 還佔著顯存時建議 cpu）
+  batch_size: 8
+  scale: 2.5                 # 標準 CLIPScore 的縮放常數 w
+  # CLIP 文字編碼器硬上限 77 個 token。超過的會被截斷，報告會列出被截斷筆數——
+  # 截斷比例高的話，分數只反映了描述的前半段。
+  max_text_tokens: 77
+
+llm_judge:
+  # 把圖片、參考描述、模型輸出一起交給一個看得見圖的模型評分。
+  # 這是這裡唯一能量到「有沒有幻覺」的指標，但它是模型意見，不是 ground truth。
+  provider: anthropic
+  model: claude-opus-5
+  # Opus 5 不接受 temperature（會回 400），所以不要在這裡加。
+  # 用 effort 控制思考深度：low / medium / high / xhigh / max
+  effort: medium
+  max_tokens: 8192
+  send_image: true           # false 就只比對文字，會完全量不到幻覺
+  max_image_edge: 1024       # 送出前先縮到長邊 1024：省 input token，不影響判斷
+  concurrency: 4
+  max_samples: null          # null = 全部；先試跑可以設 5
+  enable_fallbacks: true     # 遇到 refusal 時走伺服器端 fallback
+  cost_estimate_only: false  # true = 只印預估花費，不真的呼叫 API
 
 serving:
   host: 0.0.0.0

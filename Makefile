@@ -17,7 +17,7 @@ MODEL   ?=
 MODEL_ARG := $(if $(MODEL),--override-file configs/models/$(MODEL).yaml,)
 ARGS    := --config $(CONFIG) $(MODEL_ARG) $(OVERRIDE)
 
-.PHONY: help setup setup-gpu data features train eval serve weights upload space test lint fmt clean all
+.PHONY: help setup setup-gpu data features train eval score serve weights upload space test lint fmt clean all
 .DEFAULT_GOAL := help
 
 help:
@@ -26,7 +26,8 @@ help:
 	@echo "make data      下載原始資料集到 data/raw/"
 	@echo "make features  清洗 + 驗證 + 切分 -> data/processed/ 與 data/splits/"
 	@echo "make train     LoRA 微調（只讀 train 切分）"
-	@echo "make eval      在 test 切分上算 BLEU/ROUGE（含 bootstrap 信賴區間）"
+	@echo "make eval      在 test 切分上產生預測並評分（CLIPScore + LLM-as-judge）"
+	@echo "make score     只重算指標，不重新產生預測"
 	@echo "make weights   從 Hugging Face 下載 LoRA 權重到 models/lora/"
 	@echo "make serve     啟動 Gradio 介面"
 	@echo "make upload    把 models/lora/ 推到 Hugging Face"
@@ -38,10 +39,10 @@ help:
 	@echo "               預設 qwen2_5_vl_7b（Apache 2.0）；上課用 qwen2_vl_2b"
 
 setup:
-	uv sync --extra dev --extra eval --extra serve
+	uv sync --extra dev --extra clip --extra judge --extra serve
 
 setup-gpu:
-	uv sync --extra dev --extra eval --extra serve --extra gpu
+	uv sync --extra dev --extra clip --extra judge --extra serve --extra gpu
 
 data:
 	$(PY) -m src.data.download $(ARGS)
@@ -55,6 +56,10 @@ train: features
 
 eval:
 	$(PY) -m src.models.evaluate $(ARGS)
+
+# 只重算指標，不重新產生預測（讀 reports/predictions_<split>.jsonl）
+score:
+	$(PY) -m src.models.score $(ARGS)
 
 weights:
 	$(PY) -m src.models.download $(ARGS)
