@@ -1,7 +1,10 @@
 # AstroVision LoRA — 天文影像描述
 
-用 LoRA 微調 Llama-3.2-11B-Vision，讓模型用天文資料集的語彙描述星體與探測器影像，
+用 LoRA 微調視覺語言模型，讓它用天文資料集的語彙描述星體與探測器影像，
 並且**讓評估數字是可信的**。
+
+預設基礎模型是 **Qwen2.5-VL-7B-Instruct**（Apache 2.0、不需接受授權、無地域限制，
+4-bit 6.43 GiB，T4 跑得動）。換模型是改設定，不是改程式——見[換基礎模型](#換基礎模型)。
 
 ## 問題
 
@@ -120,6 +123,25 @@ make weights OVERRIDE="lora.repo_id=<user>/<adapter-repo>"
 make train OVERRIDE="train.max_steps=60 lora.r=32 features.clean_mode=aggressive"
 ```
 
+## 換基礎模型
+
+```bash
+make train MODEL=qwen2_vl_2b
+```
+
+| 預設 | 授權 | 4-bit 大小 | 說明 |
+|---|---|---|---|
+| `qwen2_5_vl_7b`（預設） | Apache 2.0 | 6.43 GiB | 品質最好，T4 載完剩約 8 GB 給訓練 |
+| `qwen2_vl_2b` | Apache 2.0 | 2.29 GiB | 上課首選，載入與訓練都快 |
+| `llama3_2_11b_vision` | Llama 3.2 Community | 7.37 GiB | 原專案用的；需顯示 "Built with Llama"，且視覺功能歐盟境內不得使用 |
+
+`MODEL=` 對應 `configs/models/<name>.yaml`。**同一次實驗的 `train` / `eval` / `serve`
+要用同一個 `MODEL`**，否則 adapter 對不上基礎模型會直接載入失敗。
+
+Qwen2-VL 系列是動態解析度：處理器預設上限 12.8M 像素，一張大圖就能產生上萬個
+vision token，在 T4 上必爆。`model.image_max_pixels` 預設夾到 768×768（約 750 個 token），
+在 `loader.clamp_image_resolution()` 套用；mllama 是固定 tiling，該設定會自動變成 no-op。
+
 ## 修了什麼
 
 | Bug | 原本 | 現在 | 擋住它的東西 |
@@ -145,6 +167,7 @@ make train OVERRIDE="train.max_steps=60 lora.r=32 features.clean_mode=aggressive
 ├── app.py                   Hugging Face Space 進入點（薄殼，實作在 src/serving/）
 ├── requirements.txt         Spaces 專用（Spaces 不讀 pyproject.toml）
 ├── configs/                 唯一的超參數來源
+│   └── models/              基礎模型預設（Qwen / Llama）
 ├── deploy/space/README.md   Space 用的 README，含 HF frontmatter
 ├── src/
 │   ├── config.py            YAML 載入與 CLI 覆寫
@@ -201,6 +224,8 @@ CI 不裝 GPU 堆疊，所有測試都用合成資料在 CPU 上跑，不下載�
 
 ## 授權與出處
 
-基礎模型 `unsloth/Llama-3.2-11B-Vision-Instruct` 沿用 Llama 3.2 Community License。
+預設基礎模型 `Qwen2.5-VL-7B-Instruct` 採 Apache 2.0。若切換到
+`llama3_2_11b_vision` 預設，則沿用 Llama 3.2 Community License，
+公開散布時必須顯示 "Built with Llama"，且其視覺功能在歐盟境內不得使用。
 資料集出自 [`AIOmarRehan/space-multimodal-dataset`](https://huggingface.co/datasets/AIOmarRehan/space-multimodal-dataset)。
 流程參考 [Unsloth_Llama_3.2_11B_Vision_Instruct_Astronomy](https://github.com/AIOmarRehan)。

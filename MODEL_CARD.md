@@ -4,13 +4,13 @@
 
 | 項目 | 內容 |
 |---|---|
-| 基礎模型 | `unsloth/Llama-3.2-11B-Vision-Instruct`（4-bit bnb 量化，約 7.9 GB） |
+| 基礎模型 | 預設 `unsloth/Qwen2.5-VL-7B-Instruct`（4-bit，6.43 GiB）；可換 `Qwen2-VL-2B`（2.29 GiB）或 `Llama-3.2-11B-Vision`（7.37 GiB），見 `configs/models/` |
 | 微調方式 | LoRA（預設 r=16, alpha=16, dropout=0），視覺與語言層皆掛 adapter |
 | 訓練資料 | `AIOmarRehan/space-multimodal-dataset`，250 組影像–caption |
 | 訓練規模 | 預設 `max_steps=30`、有效 batch 8 → 約 240 個樣本次，**連一個 epoch 都沒跑完** |
 | 任務 | 單張天文影像 → 一段英文描述 |
 | 硬體 | 單張 Tesla T4（16 GB）可訓練與推論 |
-| 授權 | 依循 Llama 3.2 Community License |
+| 授權 | 預設模型 Apache 2.0；換到 Llama 預設則依循 Llama 3.2 Community License |
 
 ## 預期用途
 
@@ -99,8 +99,11 @@ ROUGE 偏向 recall，長輸出容易佔便宜。兩者都**量不到事實正�
   （整條 4.x 線都不支援 hub 1.x；要用 hub 1.x 得跳到 transformers 5.2.0～5.5.0，
   但那是 major 改版，processor 與 `SFTConfig` 介面都有變動）。
   `4.57.0`／`4.57.4`／`4.57.5` 被 unsloth 的 metadata 排除，所以取 `4.57.3`。
-- 在 T4 上，一次失敗的載入會留下約 7.9 GB 殘留顯存，直接重跑必定 OOM。
-  `assert_gpu_headroom()` 會先擋下並提示重啟 runtime。
+- 在 T4 上，一次失敗的載入會把整份權重留在顯存裡（7B 約 6.4 GB、11B 約 7.4 GB），
+  直接重跑第二次必定 OOM。`assert_gpu_headroom()` 會先擋下並提示重啟 runtime。
+- Qwen2-VL 系列是動態解析度，處理器預設上限 12.8M 像素會替一張圖產生上萬個 vision
+  token。`model.image_max_pixels` 預設夾到 768×768（約 750 個 token），這會犧牲細節，
+  但不夾的話 T4 一定爆。mllama 是固定 tiling，此設定為 no-op。
 
 ## 引用
 

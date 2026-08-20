@@ -1,0 +1,10 @@
+# 輕量選項。Apache 2.0，4-bit 只有 2.29 GiB。
+# 上課用這個：載入快、訓練快、T4 上可以把 batch 開大。品質比 7B 差。
+model:
+  base_id: unsloth/Qwen2-VL-2B-Instruct-unsloth-bnb-4bit
+  min_free_vram_gb: 3.0
+  image_max_pixels: 589824
+  license_notice: "基礎模型 Qwen2-VL-2B-Instruct，採 Apache 2.0 授權。"
+train:
+  per_device_train_batch_size: 4   # 模型小，塞得下
+  gradient_accumulation_steps: 2   # 有效 batch 維持 8

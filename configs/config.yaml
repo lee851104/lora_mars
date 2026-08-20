@@ -36,12 +36,19 @@ split:
   stratify_by: label      # null 可關閉分層抽樣
 
 model:
-  base_id: unsloth/Llama-3.2-11B-Vision-Instruct
+  # 預設 Qwen2.5-VL-7B：Apache 2.0、不需接受授權、無地域限制、4-bit 6.43 GiB。
+  # 換模型用 `make train MODEL=qwen2_vl_2b`，可選的預設見 configs/models/README.md。
+  base_id: unsloth/Qwen2.5-VL-7B-Instruct-unsloth-bnb-4bit
   load_in_4bit: true
   use_gradient_checkpointing: unsloth
   max_seq_length: 2048
   local_files_only: false
-  min_free_vram_gb: 9.0   # 低於此值就拒絕載入，並提示重啟（避免 7.9GB 殘留造成的 OOM）
+  min_free_vram_gb: 7.5   # 低於此值就拒絕載入，並提示重啟（避免殘留顯存造成的 OOM）
+  # Qwen2-VL 系列是動態解析度：處理器預設上限 12.8M 像素，一張大圖就能產生上萬個
+  # vision token，在 T4 上必爆。夾到 768x768（約 750 個 token）。
+  # null = 不動處理器預設（mllama 這種固定 tiling 的架構就設 null）。
+  image_max_pixels: 589824
+  license_notice: "基礎模型 Qwen2.5-VL-7B-Instruct，採 Apache 2.0 授權。"
 
 lora:
   r: 16

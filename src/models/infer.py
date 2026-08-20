@@ -70,6 +70,22 @@ def prompt_length(inputs: Any) -> int:
     return int(inputs["input_ids"].shape[1])
 
 
+def call_processor(tokenizer: Any, image: Any, text: str) -> Any:
+    """Run the processor across vision architectures.
+
+    Every processor here declares `__call__(self, images=None, text=None, ...)`,
+    so keywords are the safe form and make the mapping explicit - the original
+    notebook's positional `tokenizer(image, text)` silently depends on that
+    argument order staying first-images across model families. Some wrapped
+    processors only accept positional, so fall back rather than fail.
+    """
+    kwargs = {"add_special_tokens": False, "return_tensors": "pt"}
+    try:
+        return tokenizer(images=image, text=text, **kwargs)
+    except TypeError:
+        return tokenizer(image, text, **kwargs)
+
+
 def generate_caption(
     model: Any,
     tokenizer: Any,
@@ -87,13 +103,12 @@ def generate_caption(
     import torch
 
     messages = inference_messages(instruction)
-    prompt_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-    inputs = tokenizer(
-        image,
-        prompt_text,
-        add_special_tokens=False,  # the chat template already added them
-        return_tensors="pt",
-    ).to(device)
+    # tokenize=False explicitly: processors default to returning a string, but
+    # tokenizers default to returning ids, and the wrapper differs per model.
+    prompt_text = tokenizer.apply_chat_template(
+        messages, add_generation_prompt=True, tokenize=False
+    )
+    inputs = call_processor(tokenizer, image, prompt_text).to(device)
 
     n_prompt = prompt_length(inputs)
     gen_kwargs = build_gen_kwargs(max_new_tokens, do_sample, temperature, top_p, min_p)

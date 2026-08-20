@@ -43,11 +43,11 @@ except Exception:  # pragma: no cover - depends on deployment target
 
 _STATE: dict[str, Any] = {"loaded": None, "cfg": None, "error": None}
 
-ABOUT = """
+ABOUT_TEMPLATE = """
 ### 這是什麼
 
-一個 **11B 參數的視覺語言模型**（Llama 3.2 11B Vision），用 LoRA 在 250 張天文照片上
-微調過。你上傳一張圖，它用天文資料集的語彙描述你看到的東西。
+一個視覺語言模型（`{base_id}`），用 LoRA 在 250 張天文照片上微調過。
+你上傳一張圖，它用天文資料集的語彙描述你看到的東西。
 
 「原廠模型」和「微調後」是**同一個模型**——微調只是在原本的權重上加了一層很薄的
 adapter（LoRA），比較欄位是把那層關掉再跑一次。所以你看到的差異，就是微調的效果。
@@ -67,9 +67,18 @@ adapter（LoRA），比較欄位是把那層關掉再跑一次。所以你看到
 
 ---
 
-**Built with Llama.** 基礎模型為 Meta Llama 3.2 11B Vision Instruct，使用受
-[Llama 3.2 Community License](https://www.llama.com/llama3_2/license/) 約束。
+**授權**：{license_notice}
 """
+
+
+def about_text(cfg: DictConfig) -> str:
+    """Rendered from config so the model name and licence notice always match
+    the weights actually configured - the Llama presets carry an attribution
+    requirement that the Apache-2.0 ones do not."""
+    return ABOUT_TEMPLATE.format(
+        base_id=cfg.model.base_id,
+        license_notice=cfg.model.get("license_notice") or "（未在設定檔中指定）",
+    )
 
 
 def _cfg() -> DictConfig:
@@ -353,7 +362,7 @@ def build_demo(cfg: DictConfig):
             )
 
         with gr.Tab("說明"):
-            gr.Markdown(ABOUT)
+            gr.Markdown(about_text(cfg))
 
         with gr.Tab("狀態"):
             detail_md = gr.Markdown(weights_detail())

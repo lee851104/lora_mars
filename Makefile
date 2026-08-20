@@ -10,6 +10,13 @@ PY      := uv run python
 CONFIG  ?= configs/config.yaml
 OVERRIDE ?=
 
+# MODEL 選 configs/models/<name>.yaml 這個預設檔。可用的看 configs/models/README.md。
+#   make train MODEL=qwen2_vl_2b
+# 同一次實驗的 train / eval / serve 要用同一個 MODEL，否則 adapter 對不上基礎模型。
+MODEL   ?=
+MODEL_ARG := $(if $(MODEL),--override-file configs/models/$(MODEL).yaml,)
+ARGS    := --config $(CONFIG) $(MODEL_ARG) $(OVERRIDE)
+
 .PHONY: help setup setup-gpu data features train eval serve weights upload space test lint fmt clean all
 .DEFAULT_GOAL := help
 
@@ -26,6 +33,9 @@ help:
 	@echo "make space     組出 build/space/，準備推到 Hugging Face Space"
 	@echo "make test      跑測試（含 test_no_leakage.py）"
 	@echo "make all       data -> features -> train -> eval"
+	@echo ""
+	@echo "MODEL=<name>   換基礎模型，見 configs/models/README.md"
+	@echo "               預設 qwen2_5_vl_7b（Apache 2.0）；上課用 qwen2_vl_2b"
 
 setup:
 	uv sync --extra dev --extra eval --extra serve
@@ -34,30 +44,30 @@ setup-gpu:
 	uv sync --extra dev --extra eval --extra serve --extra gpu
 
 data:
-	$(PY) -m src.data.download --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.data.download $(ARGS)
 
 features:
-	$(PY) -m src.data.build --config $(CONFIG) $(OVERRIDE)
-	$(PY) -m src.data.split --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.data.build $(ARGS)
+	$(PY) -m src.data.split $(ARGS)
 
 train: features
-	$(PY) -m src.models.train --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.models.train $(ARGS)
 
 eval:
-	$(PY) -m src.models.evaluate --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.models.evaluate $(ARGS)
 
 weights:
-	$(PY) -m src.models.download --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.models.download $(ARGS)
 
 serve:
-	$(PY) -m src.serving.app --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.serving.app $(ARGS)
 
 # Colab 上想要對外連結就加 OVERRIDE="serving.share=true"
 upload:
-	$(PY) -m src.models.upload --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.models.upload $(ARGS)
 
 space:
-	$(PY) -m src.serving.build_space --config $(CONFIG) $(OVERRIDE)
+	$(PY) -m src.serving.build_space $(ARGS)
 
 test:
 	uv run pytest

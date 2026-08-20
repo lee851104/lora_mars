@@ -1,0 +1,11 @@
+# 原專案用的模型。可以跑，但有兩個限制要自己確認：
+#   1. Llama 3.2 Community License —— 公開散布時必須顯示 "Built with Llama"
+#   2. Llama 3.2 的視覺功能，歐盟境內的自然人或法人不得使用（授權的地域限制）
+# 4-bit 權重 7.37 GiB。
+model:
+  base_id: unsloth/Llama-3.2-11B-Vision-Instruct-unsloth-bnb-4bit
+  min_free_vram_gb: 9.0
+  image_max_pixels: null          # mllama 是固定 tiling，沒有動態解析度可調
+  license_notice: >-
+    Built with Llama. 基礎模型 Meta Llama 3.2 11B Vision Instruct，使用受
+    Llama 3.2 Community License 約束；其視覺功能在歐盟境內不得使用。

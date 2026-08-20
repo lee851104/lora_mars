@@ -71,6 +71,37 @@ def assert_gpu_headroom(min_free_gb: float) -> None:
         )
 
 
+def clamp_image_resolution(tokenizer: Any, max_pixels: int | None) -> dict[str, Any]:
+    """Cap the vision-token budget on dynamic-resolution processors.
+
+    Qwen2-VL and Qwen2.5-VL size their vision input from the actual image, with
+    a default ceiling around 12.8M pixels - roughly sixteen thousand vision
+    tokens for one photo, which no 16 GB card survives. Clamping to ~590k pixels
+    (768x768) costs some detail and buys a ~750 token budget instead.
+
+    Architectures with fixed tiling (mllama) have no such knob; this is then a
+    no-op, so the same call is safe for every model preset.
+    """
+    if not max_pixels:
+        return {}
+
+    image_processor = getattr(tokenizer, "image_processor", None)
+    if image_processor is None:
+        return {}
+
+    applied: dict[str, Any] = {}
+    if hasattr(image_processor, "max_pixels"):
+        image_processor.max_pixels = int(max_pixels)
+        applied["max_pixels"] = int(max_pixels)
+
+    size = getattr(image_processor, "size", None)
+    if isinstance(size, dict) and "longest_edge" in size:
+        size["longest_edge"] = int(max_pixels)
+        applied["size.longest_edge"] = int(max_pixels)
+
+    return applied
+
+
 def load_base(cfg: DictConfig) -> tuple[Any, Any]:
     """Load the 4-bit base vision model."""
     from unsloth import FastVisionModel
@@ -82,6 +113,11 @@ def load_base(cfg: DictConfig) -> tuple[Any, Any]:
         use_gradient_checkpointing=cfg.model.use_gradient_checkpointing,
         local_files_only=bool(cfg.model.local_files_only),
     )
+
+    applied = clamp_image_resolution(tokenizer, cfg.model.get("image_max_pixels"))
+    if applied:
+        print(f"[loader] capped vision resolution: {applied}")
+
     return model, tokenizer
 
 
