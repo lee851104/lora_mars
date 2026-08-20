@@ -1,0 +1,20 @@
+# Normalise line endings so a Windows-authored checkout still runs on Colab/Linux.
+* text=auto
+
+# Makefile recipes break if a line ends with CR - force LF everywhere.
+Makefile text eol=lf
+*.sh      text eol=lf
+
+*.py    text
+*.yml   text
+*.yaml  text
+*.toml  text
+*.md    text
+*.ipynb text
+uv.lock text
+
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.safetensors  binary
+*.bin          binary

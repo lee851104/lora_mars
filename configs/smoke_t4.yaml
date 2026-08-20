@@ -1,0 +1,11 @@
+# 冒煙測試用的覆寫檔：最小步數，確認流程能從頭跑到尾。
+#   make train CONFIG=configs/config.yaml OVERRIDE="train.max_steps=2"
+# 或直接：
+#   uv run python -m src.models.train --config configs/config.yaml --override-file configs/smoke_t4.yaml
+train:
+  max_steps: 2
+  warmup_steps: 0
+  logging_steps: 1
+eval:
+  max_new_tokens: 32
+  bootstrap_samples: 100

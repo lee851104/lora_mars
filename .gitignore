@@ -1,0 +1,30 @@
+# ── 資料與權重一律不進版控（規格要求）─────────────────────────
+data/*
+models/*
+outputs/
+!data/.gitkeep
+!models/.gitkeep
+
+# 產出物
+reports/*.json
+reports/*.jsonl
+reports/figures/*.png
+!reports/figures/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# 環境
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

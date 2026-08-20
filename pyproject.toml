@@ -1,0 +1,80 @@
+[project]
+name = "lora-astro"
+version = "0.1.0"
+description = "Llama-3.2-11B-Vision LoRA 天文影像描述 — 可重現的訓練/評估/服務流程"
+readme = "README.md"
+requires-python = ">=3.10"
+
+# 基礎依賴：不含 GPU 堆疊，讓 CI 與單元測試能在 CPU-only 環境跑
+dependencies = [
+    "numpy>=1.26,<3",
+    "pandas>=2.0",
+    "pillow>=10.0",
+    "omegaconf>=2.3",
+    "scikit-learn>=1.3",
+    "matplotlib>=3.7",
+    # unsloth 的區間，先在這裡對齊，之後加 --extra gpu 時解析器不會翻盤
+    "datasets>=3.4.1,!=4.0.*,!=4.1.0,<4.4.0",
+    # transformers 4.57.x 明確要求 huggingface-hub<1.0。
+    # hub 1.x 會對不存在的 additional_chat_templates/ 目錄拋 RemoteEntryNotFoundError，
+    # 而 4.5x 沒有攔這個例外 —— 這就是 4.57.x 直接把上限鎖在 1.0 的原因。
+    "huggingface_hub>=0.34.0,<1.0",
+]
+
+[project.optional-dependencies]
+# ── GPU 訓練堆疊 ────────────────────────────────────────────
+# transformers 釘 4.57.3：
+#   * 4.56.2（原 notebook 的釘版）搭到 huggingface_hub 1.x 會在載入 processor 時
+#     因為探測不存在的 additional_chat_templates/ 目錄而 404 失敗；
+#   * 4.57.x 把 huggingface-hub 上限鎖在 <1.0，等於從依賴層面消除那個組合；
+#   * 4.57.0 / 4.57.4 / 4.57.5 被 unsloth 的 metadata 排除，所以取 4.57.3。
+# 要改用 transformers 5.x（它才支援 hub 1.x）的話，unsloth 只接受 5.2.0～5.5.0，
+# 且 processor 與 SFTConfig 的介面有變動，不是換個數字就好。
+gpu = [
+    "torch>=2.4",
+    "transformers==4.57.3",
+    "unsloth>=2025.1.1",
+    "unsloth_zoo",
+    "peft>=0.18.0",
+    "trl>=0.18.2,!=0.19.0,<=0.24.0",
+    "accelerate>=1.0",
+    "bitsandbytes>=0.47.0",
+    "sentencepiece>=0.2.0",
+    "protobuf",
+]
+eval = [
+    "evaluate>=0.4.3",
+    "rouge_score>=0.1.2",
+    "nltk>=3.8",
+]
+serve = [
+    # Gradio 6 moved `theme` to launch() and dropped Textbox(show_copy_button=...).
+    # src/serving/app.py targets the 6.x API, so keep the major version pinned.
+    "gradio>=6,<7",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "gpu: 需要 CUDA 與完整 GPU 堆疊，CI 會跳過",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

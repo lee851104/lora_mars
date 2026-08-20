@@ -1,0 +1,96 @@
+# 唯一的超參數來源。程式碼裡不允許出現硬編碼的數字或路徑。
+# CLI 覆寫：  make train OVERRIDE="train.max_steps=60 lora.r=32"
+
+seed: 3407
+
+paths:
+  raw_dir:       data/raw
+  processed_dir: data/processed
+  splits_dir:    data/splits
+  models_dir:    models
+  reports_dir:   reports
+  figures_dir:   reports/figures
+  outputs_dir:   outputs
+
+data:
+  hf_repo:       AIOmarRehan/space-multimodal-dataset
+  hf_split:      train
+  images_subdir: images
+  metadata_file: data.json
+
+features:
+  # conservative = 只做空白正規化，保留大小寫、標點、數字
+  # aggressive   = 原專案做法：全轉小寫並刪除所有非字母字元
+  #                會摧毀 "M31" / "Apollo 11" 這類天文專有名詞，預設不用
+  # none         = 完全不動
+  clean_mode: conservative
+  drop_duplicate_captions: true
+  min_caption_chars: 10
+
+split:
+  # 這裡是切分的唯一定義處。改動任何一項都會讓 manifest 的 hash 改變，
+  # 舊模型的 train_meta.json 就對不上，tests/test_no_leakage.py 會失敗。
+  test_size: 0.1
+  val_size:  0.1
+  seed: 42
+  stratify_by: label      # null 可關閉分層抽樣
+
+model:
+  base_id: unsloth/Llama-3.2-11B-Vision-Instruct
+  load_in_4bit: true
+  use_gradient_checkpointing: unsloth
+  max_seq_length: 2048
+  local_files_only: false
+  min_free_vram_gb: 9.0   # 低於此值就拒絕載入，並提示重啟（避免 7.9GB 殘留造成的 OOM）
+
+lora:
+  r: 16
+  alpha: 16               # 經驗法則：alpha >= r
+  dropout: 0.0
+  bias: none
+  finetune_vision_layers: true
+  finetune_language_layers: true
+  finetune_attention_modules: true
+  finetune_mlp_modules: true
+  use_rslora: false
+  # ── 權重下載（後面填）────────────────────────────────────
+  # repo_id 填好後跑 `make weights`，會抓到 local_dir；
+  # 服務與評估都優先讀 local_dir，抓不到才退回 repo_id。
+  repo_id: null
+  local_dir: models/lora
+
+train:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4    # 有效 batch = 8
+  warmup_steps: 5
+  max_steps: 30                     # 設 null 改用 num_train_epochs
+  num_train_epochs: null
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  lr_scheduler_type: linear
+  logging_steps: 1
+  optim: adamw_8bit
+  save_adapter: true
+
+eval:
+  instruction: "You are an expert astronomer. Describe accurately what you see in this image."
+  split: test                # 只准是 test 或 val，程式會擋住 train
+  max_new_tokens: 128
+  # 評估一律 greedy：要可重現。do_sample=false 時 temperature/top_p 會被丟掉，
+  # 不會像原本那樣傳了 temperature 卻被 transformers 靜默忽略。
+  do_sample: false
+  temperature: null
+  top_p: null
+  bootstrap_samples: 1000
+  bootstrap_seed: 0
+  save_predictions: true
+
+serving:
+  host: 0.0.0.0
+  port: 7860
+  share: false
+  default_instruction: "You are an expert astronomer. Describe accurately what you see in this image."
+  max_new_tokens: 256
+  do_sample: true
+  temperature: 1.0
+  top_p: 0.9
