@@ -64,6 +64,11 @@ adapter（LoRA），比較欄位是把那層關掉再跑一次。所以你看到
 訓練資料只有 250 筆，而且預設只訓練 30 步——連一個 epoch 都沒跑完。模型主要學到的是
 **輸出風格**（句子長度、用語、句型），不是新的天文知識。完整的限制與已知偏誤寫在
 專案的 `MODEL_CARD.md`。
+
+---
+
+**Built with Llama.** 基礎模型為 Meta Llama 3.2 11B Vision Instruct，使用受
+[Llama 3.2 Community License](https://www.llama.com/llama3_2/license/) 約束。
 """
 
 

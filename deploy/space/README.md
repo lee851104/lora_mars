@@ -36,6 +36,14 @@ short_description: Llama-3.2-11B-Vision + LoRA，天文影像描述，附微調�
 30 步，模型學到的主要是輸出風格而不是新的天文知識。完整的限制、已知偏誤與不適用情境
 寫在專案的 `MODEL_CARD.md`。
 
+## 授權標示
+
+**Built with Llama.**
+
+基礎模型為 Meta Llama 3.2 11B Vision Instruct，使用受 [Llama 3.2 Community License]
+(https://www.llama.com/llama3_2/license/) 約束。Llama 3.2 的視覺功能在歐盟境內的
+自然人或法人不得使用（授權條款的地域限制）。
+
 ## 原始碼
 
 <https://github.com/lee851104/lora_mars>
