@@ -5,11 +5,12 @@ outputs/
 !data/.gitkeep
 !models/.gitkeep
 
-# 產出物
-reports/*.json
-reports/*.jsonl
-reports/figures/*.png
-!reports/figures/.gitkeep
+# 產出物：摘要與圖表要進版控，README 的成果表才有依據可查。
+# 只排除逐筆預測（檔案大、對讀者沒用）。
+reports/predictions_*.jsonl
+
+# make space 的暫存輸出
+build/
 
 # Python
 __pycache__/

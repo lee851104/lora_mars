@@ -34,16 +34,16 @@ decode 一定去掉 prompt、greedy 模式根本不會攜帶 sampling 參數。�
 
 ## Demo
 
-Gradio 介面（本機）：
-
 ```bash
 make serve
 ```
 
-開 <http://localhost:7860>。介面標頭會明確標示目前載入的是 **base 模型**還是 **LoRA 權重**，
+開 <http://localhost:7860>。介面可以**並排比較微調前後**——兩欄是同一個模型，
+「原廠模型」那欄是在 `PeftModel.disable_adapter()` 裡跑的，所以不多吃顯存，
+看到的差異就是 LoRA 的效果。標頭永遠標示現在載入的是 base 還是 LoRA，
 避免把未微調的輸出誤認成微調結果。
 
-線上 Demo：_尚未部署_
+線上 Demo：_尚未部署_（部署方式見下方[部署](#部署)）
 
 ## 架構
 
@@ -92,6 +92,8 @@ make features   # 清洗 + 驗證 + 切分 -> data/processed/ 與 data/splits/
 make train      # LoRA 微調（只讀 train 切分）
 make eval       # 在 test 切分上算 BLEU/ROUGE + bootstrap CI
 make serve      # Gradio
+make upload     # 把 models/lora/ 推到 Hugging Face
+make space      # 組出 build/space/，準備推到 Hugging Face Space
 ```
 
 Windows 沒有 `make` 的話，每個 target 就是一行 `uv run python -m ...`，直接看 `Makefile`。
@@ -140,7 +142,10 @@ make train OVERRIDE="train.max_steps=60 lora.r=32 features.clean_mode=aggressive
 ├── MODEL_CARD.md            用途、限制、已知偏誤、不適用情境
 ├── Makefile                 setup / data / features / train / eval / serve
 ├── pyproject.toml           uv 管理依賴（gpu / eval / serve / dev 分組）
+├── app.py                   Hugging Face Space 進入點（薄殼，實作在 src/serving/）
+├── requirements.txt         Spaces 專用（Spaces 不讀 pyproject.toml）
 ├── configs/                 唯一的超參數來源
+├── deploy/space/README.md   Space 用的 README，含 HF frontmatter
 ├── src/
 │   ├── config.py            YAML 載入與 CLI 覆寫
 │   ├── data/                下載、驗證、建置、切分
@@ -155,6 +160,36 @@ make train OVERRIDE="train.max_steps=60 lora.r=32 features.clean_mode=aggressive
 
 > `src/` 直接作為 import 根，所以是 `from src.data.split import ...`。
 > 這是為了讓目錄結構跟規格的架構圖一比一對應。
+
+## 部署
+
+### 選項 A：Colab 臨時公開連結（免費，最快）
+
+Colab 上跑：
+
+```bash
+make serve OVERRIDE="serving.share=true"
+```
+
+會拿到一個 `*.gradio.live` 連結，72 小時內有效。上課 demo 用這個最省事。
+
+### 選項 B：Hugging Face Space（長期）
+
+先把 adapter 上傳（Space 讀不到你本機的 `models/lora/`）：
+
+```bash
+make upload OVERRIDE="upload.repo_id=<user>/<adapter-repo>"
+```
+
+再組出 Space 檔案並照著印出來的指示推上去：
+
+```bash
+make space
+```
+
+**硬體：免費的 CPU basic 跑不動 11B 模型**，一定要換成 T4 small 或更好。
+ZeroGPU 可行但需要 PRO，而且每次呼叫都要重新把 8 GB 權重搬上 GPU。
+Space 建好後到 Settings → Variables 加 `LORA_REPO_ID`，沒設的話介面會標示現在跑的是 base 模型。
 
 ## 測試
 

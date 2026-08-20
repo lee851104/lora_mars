@@ -1,0 +1,27 @@
+# Hugging Face Spaces 專用。Spaces 不讀 pyproject.toml，也不讀 uv.lock。
+# 本機開發請用 `uv sync`，不要用這個檔案。
+#
+# gradio 的版本由 deploy/space/README.md 的 sdk_version 決定，
+# 寫在這裡會跟 Spaces 打架，所以刻意不列。
+#
+# 這裡只有「推論」需要的東西：trl / datasets / sklearn 是訓練才要的，
+# unsloth 會自己把它需要的那幾個拉下來。
+
+torch
+transformers==4.57.3
+huggingface_hub<1.0
+
+unsloth
+unsloth_zoo
+peft>=0.18.0
+bitsandbytes>=0.47.0
+accelerate
+sentencepiece
+protobuf
+
+omegaconf>=2.3
+pillow
+numpy
+
+# ZeroGPU 需要；在非 Spaces 環境沒裝也不會壞（app.py 有 fallback）
+spaces

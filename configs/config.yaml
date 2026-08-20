@@ -59,6 +59,14 @@ lora:
   repo_id: null
   local_dir: models/lora
 
+upload:
+  # `make upload` 把 models/lora/ 推到 Hugging Face。
+  # Space 讀不到你本機的權重，所以要先上傳。
+  repo_id: null              # 空的話沿用 lora.repo_id
+  private: false             # Space 要讀就設 false，否則 Space 要另外給 HF_TOKEN
+  commit_message: "upload LoRA adapter"
+  source_url: "https://github.com/lee851104/lora_mars"
+
 train:
   per_device_train_batch_size: 2
   gradient_accumulation_steps: 4    # 有效 batch = 8

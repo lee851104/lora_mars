@@ -10,7 +10,7 @@ PY      := uv run python
 CONFIG  ?= configs/config.yaml
 OVERRIDE ?=
 
-.PHONY: help setup data features train eval serve weights test lint fmt clean all
+.PHONY: help setup setup-gpu data features train eval serve weights upload space test lint fmt clean all
 .DEFAULT_GOAL := help
 
 help:
@@ -22,6 +22,8 @@ help:
 	@echo "make eval      在 test 切分上算 BLEU/ROUGE（含 bootstrap 信賴區間）"
 	@echo "make weights   從 Hugging Face 下載 LoRA 權重到 models/lora/"
 	@echo "make serve     啟動 Gradio 介面"
+	@echo "make upload    把 models/lora/ 推到 Hugging Face"
+	@echo "make space     組出 build/space/，準備推到 Hugging Face Space"
 	@echo "make test      跑測試（含 test_no_leakage.py）"
 	@echo "make all       data -> features -> train -> eval"
 
@@ -49,6 +51,13 @@ weights:
 
 serve:
 	$(PY) -m src.serving.app --config $(CONFIG) $(OVERRIDE)
+
+# Colab 上想要對外連結就加 OVERRIDE="serving.share=true"
+upload:
+	$(PY) -m src.models.upload --config $(CONFIG) $(OVERRIDE)
+
+space:
+	$(PY) -m src.serving.build_space --config $(CONFIG) $(OVERRIDE)
 
 test:
 	uv run pytest
