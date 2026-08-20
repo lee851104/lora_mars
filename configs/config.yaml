@@ -101,6 +101,9 @@ eval:
   temperature: null
   top_p: null
   save_predictions: true     # score 階段要讀這個檔，關掉就只能一次跑完
+  # false = 只跑基礎模型，產生成果表的 Base 對照欄（`make eval-base`）。
+  # 檔名會自動加 _base 後綴，不會蓋掉 LoRA 的報告。
+  use_adapter: true
 
   # 要算哪些指標。可選：clipscore / llm_judge / bleu_rouge
   # BLEU/ROUGE 留著是為了跟原始 notebook 對照，但它們量不到事實正確性——

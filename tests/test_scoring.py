@@ -248,3 +248,33 @@ def test_skipped_judge_is_not_reported_as_a_failure():
     assert summary["n_failed"] == 0
     assert summary["skipped"] is True
     assert "cost_estimate_only" in summary["skipped_reason"]
+
+# ── baseline variant ────────────────────────────────────────────────────────
+def test_baseline_run_writes_to_separate_files(cfg):
+    """A base run must not overwrite the LoRA report it is compared against."""
+    lora_report = score.report_path(cfg, "test")
+    lora_predictions = score.predictions_path(cfg, "test")
+
+    cfg.eval.use_adapter = False
+    base_report = score.report_path(cfg, "test")
+    base_predictions = score.predictions_path(cfg, "test")
+
+    assert score.variant(cfg) == "_base"
+    assert base_report != lora_report
+    assert base_predictions != lora_predictions
+    assert base_report.name == "eval_test_base.json"
+    assert base_predictions.name == "predictions_test_base.jsonl"
+    assert score.judge_detail_path(cfg, "test").name == "judge_test_base.jsonl"
+
+
+def test_adapter_run_uses_unsuffixed_names(cfg):
+    assert score.variant(cfg) == ""
+    assert score.report_path(cfg, "test").name == "eval_test.json"
+
+
+def test_makefile_exposes_the_baseline_target():
+    from src.config import REPO_ROOT
+
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "eval-base:" in makefile
+    assert "eval.use_adapter=false" in makefile

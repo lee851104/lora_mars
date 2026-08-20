@@ -123,13 +123,17 @@ def main(cfg: DictConfig) -> dict[str, Any]:
     records = load_split(cfg, split_name, for_eval=True)
     provenance = check_split_consistency(cfg)
 
-    loaded = load_for_inference(cfg)
+    use_adapter = bool(cfg.eval.get("use_adapter", True))
+    loaded = load_for_inference(cfg, use_adapter=use_adapter)
     print(loaded.describe())
-    if not loaded.has_adapter:
+    if not use_adapter:
+        print("[eval] baseline run: adapter deliberately skipped (eval.use_adapter=false)")
+    elif not loaded.has_adapter:
         print("[eval] WARNING: scoring the BASE model - no LoRA weights were found")
 
     context = {
         "base_id": str(cfg.model.base_id),
+        "variant": "base" if not use_adapter else "lora",
         "adapter": loaded.describe(),
         "decoding": {
             "max_new_tokens": int(cfg.eval.max_new_tokens),

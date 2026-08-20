@@ -17,7 +17,7 @@ MODEL   ?=
 MODEL_ARG := $(if $(MODEL),--override-file configs/models/$(MODEL).yaml,)
 ARGS    := --config $(CONFIG) $(MODEL_ARG) $(OVERRIDE)
 
-.PHONY: help setup setup-gpu data features train eval score serve weights upload space test lint fmt clean all
+.PHONY: help setup setup-gpu data features train eval eval-base score serve weights upload space test lint fmt clean all
 .DEFAULT_GOAL := help
 
 help:
@@ -27,6 +27,7 @@ help:
 	@echo "make features  清洗 + 驗證 + 切分 -> data/processed/ 與 data/splits/"
 	@echo "make train     LoRA 微調（只讀 train 切分）"
 	@echo "make eval      在 test 切分上產生預測並評分（CLIPScore + LLM-as-judge）"
+	@echo "make eval-base 同上但不掛 LoRA，產生成果表的 Base 對照欄"
 	@echo "make score     只重算指標，不重新產生預測"
 	@echo "make weights   從 Hugging Face 下載 LoRA 權重到 models/lora/"
 	@echo "make serve     啟動 Gradio 介面"
@@ -56,6 +57,10 @@ train: features
 
 eval:
 	$(PY) -m src.models.evaluate $(ARGS)
+
+# 成果表的 Base 對照欄：只跑基礎模型，輸出檔名自動加 _base
+eval-base:
+	$(PY) -m src.models.evaluate $(ARGS) eval.use_adapter=false
 
 # 只重算指標，不重新產生預測（讀 reports/predictions_<split>.jsonl）
 score:

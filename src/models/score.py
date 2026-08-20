@@ -28,16 +28,25 @@ KNOWN_METRICS = ("clipscore", "llm_judge", "bleu_rouge")
 PERCENTILES = (2.5, 97.5)
 
 
+def variant(cfg: DictConfig) -> str:
+    """Filename suffix for a base-model run.
+
+    Derived from the config rather than passed in, so a `use_adapter=false` run
+    cannot overwrite the LoRA report it is meant to be compared against.
+    """
+    return "" if bool(cfg.eval.get("use_adapter", True)) else "_base"
+
+
 def predictions_path(cfg: DictConfig, split: str) -> Path:
-    return Path(cfg.paths.reports_dir) / f"predictions_{split}.jsonl"
+    return Path(cfg.paths.reports_dir) / f"predictions_{split}{variant(cfg)}.jsonl"
 
 
 def report_path(cfg: DictConfig, split: str) -> Path:
-    return Path(cfg.paths.reports_dir) / f"eval_{split}.json"
+    return Path(cfg.paths.reports_dir) / f"eval_{split}{variant(cfg)}.json"
 
 
 def judge_detail_path(cfg: DictConfig, split: str) -> Path:
-    return Path(cfg.paths.reports_dir) / f"judge_{split}.jsonl"
+    return Path(cfg.paths.reports_dir) / f"judge_{split}{variant(cfg)}.jsonl"
 
 
 def load_predictions(cfg: DictConfig, split: str) -> list[dict]:

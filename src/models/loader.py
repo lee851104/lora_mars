@@ -166,11 +166,18 @@ def read_train_meta(source: str | None) -> dict[str, Any]:
     return {}
 
 
-def load_for_inference(cfg: DictConfig) -> LoadedModel:
-    """Load base + LoRA (when available) and put it into inference mode."""
+def load_for_inference(cfg: DictConfig, use_adapter: bool = True) -> LoadedModel:
+    """Load base + LoRA (when available) and put it into inference mode.
+
+    use_adapter=False loads the stock base model - that is how the Base column of
+    the results table is produced, and the only honest way to claim fine-tuning
+    changed anything.
+    """
     from unsloth import FastVisionModel
 
     source, is_local = resolve_adapter_source(cfg)
+    if not use_adapter:
+        source, is_local = None, False
     model, tokenizer = load_base(cfg)
 
     if source is not None:
