@@ -4,13 +4,31 @@
 
 | 項目 | 內容 |
 |---|---|
-| 基礎模型 | 預設 `unsloth/gemma-3-4b-it`（4-bit，4.25 GiB）；可換 `Qwen2.5-VL-7B`（6.43 GiB）、`Qwen2-VL-2B`（2.29 GiB）或 `Llama-3.2-11B-Vision`（7.37 GiB），見 `configs/models/` |
-| 微調方式 | LoRA（預設 r=16, alpha=16, dropout=0），視覺與語言層皆掛 adapter |
+| 基礎模型 | `unsloth/gemma-3-4b-it-unsloth-bnb-4bit`（4-bit，4.25 GiB）；可換 `Qwen2.5-VL-7B`、`Qwen2-VL-2B` 或 `Llama-3.2-11B-Vision`，見 `configs/models/` |
+| LoRA 權重 | [`lee851104/gemma3-4b-astronomy-lora`](https://huggingface.co/lee851104/gemma3-4b-astronomy-lora) |
+| 微調方式 | LoRA（預設 r=16, alpha=16, dropout=0）。Gemma 3 4B 在 T4 預設凍結視覺編碼器，只訓練語言端；其他預設可訓練兩端 |
 | 訓練資料 | `AIOmarRehan/space-multimodal-dataset`，250 組影像–caption |
-| 訓練規模 | 預設 `max_steps=30`、有效 batch 8 → 約 240 個樣本次，**連一個 epoch 都沒跑完** |
+| 訓練規模 | 預設 `max_steps=30`、有效 batch 8 → 約 240 個樣本次；以約 200 筆訓練集計約 1.2 epoch（去重後可能更多） |
 | 任務 | 單張天文影像 → 一段英文描述 |
 | 硬體 | 單張 Tesla T4（16 GB）可訓練與推論 |
 | 授權 | 預設 Gemma Terms of Use + Prohibited Use Policy；Qwen 預設為 Apache 2.0；Llama 預設依循 Llama 3.2 Community License |
+
+## 已完成的訓練 run
+
+| 項目 | 實際值 |
+|---|---|
+| split hash | `e2d16e46547c6f61` |
+| train / val / test | 200 / 25 / 25 |
+| steps / 約當 epoch | 30 / 1.2 |
+| 有效 batch | 8（batch 2 × gradient accumulation 4） |
+| learning rate | `2e-4`，linear schedule，warmup 5 steps |
+| 可訓練參數 | 29,802,496 / 4,329,881,968（0.69%） |
+| 平均 train loss | 2.8504；最後記錄 loss 0.8506 |
+| 執行時間 | 381.5 秒（6.36 分鐘） |
+| peak reserved VRAM | 6.836 GB（Tesla T4） |
+
+訓練 loss 只能證明最佳化有進行，不能代替 held-out 的 CIDEr、CLIPScore 或
+LLM-as-judge；實際評估數字必須由 `reports/eval_test*.json` 產生。
 
 ## 預期用途
 
@@ -44,15 +62,15 @@
 
 | 標籤 | 筆數 |
 |---|---|
-| Earth | 77 |
-| Mars | 54 |
-| Mars Rover | 46 |
-| Milky Way | 45 |
-| Hubble | 28 |
+| Mars | 50 |
+| Hubble | 50 |
+| Milky Way | 50 |
+| Mars Rover | 50 |
+| Earth | 46 |
+| Unknown | 4 |
 
-Hubble 類只有 Earth 的三分之一，模型在該類上的表現預期較差，而 held-out 裡該類可能只有
-兩三筆——**單看整體平均會蓋掉這件事**。切分有做分層抽樣（`split.stratify_by: label`），
-但樣本數本身無法靠抽樣補救。
+`Unknown` 只有 4 筆，使第二階段 val/test 分割無法維持完整分層，因此程式會退回固定 seed
+的隨機切分。held-out 仍與 train 互斥，但每類只有少量樣本，**單看整體平均會蓋掉類別差異**。
 
 ### 標籤本身就是啟發式
 `heuristic_label()` 只是關鍵字比對，用於分層抽樣與資料分佈圖，**不是訓練目標，也不是
@@ -65,6 +83,9 @@ ground truth**。任何沒命中關鍵字的 caption 都會落到 `Unknown`。
 
 ### 指標本身的限制
 
+**CIDEr** 是參考文字的 TF-IDF n-gram 共識，不看圖片。本資料每張圖只有一條參考描述，
+因此它容易把正確改寫判得偏低，也不能辨識文字一致但影像事實錯誤的輸出。
+
 **CLIPScore** 量的是圖文對齊，不是正確性。CLIP 自己也會弄錯天文細節，而且它的文字編碼器
 硬上限 77 個 token，超過就截斷——報告會列出截斷筆數。分數的絕對值沒有意義，一定要對照
 同一批圖片上人類描述拿到的 `clipscore_reference`（天花板）來讀。
@@ -76,7 +97,7 @@ ground truth**。任何沒命中關鍵字的 caption 都會落到 `Unknown`。
 **BLEU / ROUGE**（預設不啟用）是字面重疊：對「同義但換句話說」的正確描述給低分，
 對「句型一致但事實全錯」的輸出給高分。留著只為了跟原始 notebook 對照。
 
-三個指標都不能單獨作為「模型好用」的證據。
+四類指標都不能單獨作為「模型好用」的證據。
 
 ## 已知偏誤
 
@@ -95,8 +116,9 @@ ground truth**。任何沒命中關鍵字的 caption 都會落到 `Unknown`。
   驗證三個切分互斥、聯集完整，且已訓練模型記錄的 hash 與現行 manifest 一致。
 - 解碼：greedy（`do_sample=false`），確保可重現。
 - 計分：只對**新生成的 token** 計分，prompt 在 decode 前就被切掉。
-- 指標：預設 CLIPScore（無參考、附人類天花板）與 LLM-as-judge（`claude-opus-5`，
-  看得見圖，rubric `v1`，judge 不知道輸出來自 base 還是 LoRA）。BLEU/ROUGE 可選。
+- 指標：預設 CIDEr（參考文字共識）、CLIPScore（圖文對齊、附人類天花板）與
+  LLM-as-judge（`claude-opus-5`，看得見圖，rubric `v1`，judge 不知道輸出來自
+  base 還是 LoRA）。BLEU/ROUGE 可選。
 - 區間：per-sample 分數 bootstrap 重抽 1000 次取 2.5/97.5 百分位；BLEU 是 corpus-level，
   改成重抽整個語料。
 - 產生與評分分離：預測先寫成 `reports/predictions_<split>.jsonl`，評分讀那個檔，
@@ -120,7 +142,8 @@ ground truth**。任何沒命中關鍵字的 caption 都會落到 `Unknown`。
 - **Gemma 3 在 T4 上的數值穩定性**：Gemma 3 用 bf16 訓練，activation 會超過 float16
   上限（65504），而 T4（compute 7.5）沒有 bf16 硬體。unsloth 對此有專門處理
   （activation 走 bf16/fp32、只有 matmul 降到 fp16、layernorm 升到 fp32）。可以跑，
-  但這是四個預設裡最容易出現 `nan` loss 的一個；預設檔已把 learning rate 調到 1e-4。
+  但這是四個預設裡最容易出現 `nan` loss 的一個；本次以 learning rate `2e-4`
+  完成 30 steps，沒有出現 NaN。
 - Qwen2-VL 系列是動態解析度，處理器預設上限 12.8M 像素會替一張圖產生上萬個 vision
   token。`model.image_max_pixels` 預設夾到 768×768（約 750 個 token），這會犧牲細節，
   但不夾的話 T4 一定爆。mllama 是固定 tiling，此設定為 no-op。
@@ -130,6 +153,6 @@ ground truth**。任何沒命中關鍵字的 caption 都會落到 `Unknown`。
 ```
 基礎模型：Google Gemma 3 4B IT（經 Unsloth 4-bit 量化），可換 Qwen2.5-VL / Llama 3.2 Vision
 資料集：AIOmarRehan/space-multimodal-dataset
-評分：CLIPScore（openai/clip-vit-large-patch14）+ LLM-as-judge（claude-opus-5, rubric v1）
+評分：CIDEr + CLIPScore（openai/clip-vit-large-patch14）+ LLM-as-judge（claude-opus-5, rubric v1）
 流程參考：Unsloth_Llama_3.2_11B_Vision_Instruct_Astronomy
 ```

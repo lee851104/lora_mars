@@ -24,7 +24,7 @@ from omegaconf import DictConfig
 
 from src.config import config_from_args, ensure_dirs
 
-KNOWN_METRICS = ("clipscore", "llm_judge", "bleu_rouge")
+KNOWN_METRICS = ("cider", "clipscore", "llm_judge", "bleu_rouge")
 PERCENTILES = (2.5, 97.5)
 
 
@@ -101,6 +101,17 @@ def run_clipscore(cfg: DictConfig, rows: list[dict]) -> dict[str, Any]:
     return summary
 
 
+def run_cider(cfg: DictConfig, rows: list[dict]) -> dict[str, Any]:
+    from src.models import cider
+
+    return cider.compute(
+        [r["prediction"] for r in rows],
+        [r["reference"] for r in rows],
+        bootstrap_samples=int(cfg.eval.bootstrap_samples),
+        bootstrap_seed=int(cfg.eval.bootstrap_seed),
+    )
+
+
 def run_llm_judge(cfg: DictConfig, rows: list[dict], split: str) -> dict[str, Any]:
     from src.models import llm_judge
 
@@ -140,8 +151,15 @@ def score(
     rows: list[dict],
     split: str,
     context: dict[str, Any] | None = None,
+    *,
+    merge_existing: bool = False,
 ) -> dict[str, Any]:
-    """Run the enabled metrics over already-generated predictions."""
+    """Run enabled metrics, optionally preserving earlier metrics in the report.
+
+    ``evaluate`` starts a new generation run and therefore writes a fresh
+    report.  The standalone ``score`` command reuses saved predictions; when a
+    paid judge is added after free metrics, it must not erase CIDEr/CLIPScore.
+    """
     ensure_dirs(cfg, "reports_dir")
     metrics = resolve_metrics(cfg)
     print(f"[score] {len(rows)} predictions from '{split}', metrics: {metrics}")
@@ -150,7 +168,9 @@ def score(
     for name in metrics:
         print(f"\n--- {name} ---")
         try:
-            if name == "clipscore":
+            if name == "cider":
+                results[name] = run_cider(cfg, rows)
+            elif name == "clipscore":
                 results[name] = run_clipscore(cfg, rows)
             elif name == "llm_judge":
                 results[name] = run_llm_judge(cfg, rows, split)
@@ -161,13 +181,27 @@ def score(
             print(f"[score] {name} failed: {type(error).__name__}: {error}")
             results[name] = {"error": f"{type(error).__name__}: {error}"}
 
+    path = report_path(cfg, split)
+    previous: dict[str, Any] = {}
+    if merge_existing and path.exists():
+        previous = json.loads(path.read_text(encoding="utf-8"))
+        if previous.get("split") != split or previous.get("n_samples") != len(rows):
+            raise ValueError(
+                f"existing report {path} does not match split={split!r}, n={len(rows)}"
+            )
+        results = {**previous.get("metrics", {}), **results}
+
+    previous_context = {
+        key: value for key, value in previous.items()
+        if key not in {"split", "n_samples", "metrics"}
+    }
     report = {
+        **previous_context,
         "split": split,
         "n_samples": len(rows),
         **(context or {}),
         "metrics": results,
     }
-    path = report_path(cfg, split)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[score] wrote {path}")
     return report
@@ -178,6 +212,11 @@ def print_summary(report: dict[str, Any]) -> None:
     metrics = report.get("metrics", {})
     print(f"\n{'=' * 62}")
     print(f"split={report['split']}  n={report['n_samples']}")
+
+    cider = metrics.get("cider")
+    if cider and "error" not in cider:
+        print("\nCIDEr (reference-caption consensus)")
+        print(f"  cider      {cider['cider']}   CI95 {cider.get('cider_ci95')}")
 
     clip = metrics.get("clipscore")
     if clip and "error" not in clip:
@@ -226,7 +265,13 @@ def print_summary(report: dict[str, Any]) -> None:
 def main(cfg: DictConfig) -> dict[str, Any]:
     split = str(cfg.eval.split)
     rows = load_predictions(cfg, split)
-    report = score(cfg, rows, split, {"scored_from": str(predictions_path(cfg, split))})
+    report = score(
+        cfg,
+        rows,
+        split,
+        {"scored_from": str(predictions_path(cfg, split))},
+        merge_existing=True,
+    )
     print_summary(report)
     return report
 

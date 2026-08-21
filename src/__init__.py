@@ -1,3 +1,3 @@
-"""Llama-3.2-11B-Vision LoRA - astronomy image captioning."""
+"""Gemma 3 4B LoRA astronomy image captioning pipeline."""
 
 __version__ = "0.1.0"

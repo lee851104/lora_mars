@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Gemma 3 4B 天文影像描述 LoRA 專案展示">
+  <title>AstroVision LoRA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">GEMMA 3 4B · LORA · ASTRONOMY</p>
+      <h1>AstroVision LoRA</h1>
+      <p class="lead">以 250 組天文影像與描述微調視覺語言模型，建立可重現的訓練、評估與部署流程。</p>
+      <div class="actions">
+        <a class="primary" href="https://huggingface.co/lee851104/gemma3-4b-astronomy-lora">查看 LoRA 權重</a>
+        <a href="https://github.com/lee851104/lora_mars">查看 GitHub 原始碼</a>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="專案摘要">
+      <article>
+        <span>資料</span>
+        <strong>250</strong>
+        <p>train / val / test = 200 / 25 / 25，測試集未參與訓練。</p>
+      </article>
+      <article>
+        <span>訓練</span>
+        <strong>30 steps</strong>
+        <p>Tesla T4，LoRA 可訓練參數 0.69%，約 6.36 分鐘。</p>
+      </article>
+      <article>
+        <span>模型</span>
+        <strong>Gemma 3 4B</strong>
+        <p>4-bit 基礎模型；T4 上凍結視覺編碼器，訓練語言端 LoRA。</p>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div>
+        <p class="eyebrow">EVALUATION</p>
+        <h2>不只看 training loss</h2>
+      </div>
+      <p>專案使用 CIDEr、CLIPScore 與 LLM-as-judge，並比較 Base 與 LoRA 的 held-out test 結果。正式數字會在評估完成後公布，不以訓練 loss 冒充測試表現。</p>
+    </section>
+
+    <section class="notice">
+      <div class="pulse" aria-hidden="true"></div>
+      <div>
+        <h2>互動式 GPU Demo 準備中</h2>
+        <p>目前頁面為免費 Static Space，只展示專案。後續升級為 Gradio + ZeroGPU 後，將可上傳圖片並生成英文天文描述。</p>
+      </div>
+    </section>
+
+    <footer>教學與作品集用途；模型輸出不能作為科學判讀依據。</footer>
+  </main>
+</body>
+</html>

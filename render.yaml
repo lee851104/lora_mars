@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: astronomy-caption-nvidia
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python -m src.serving.nvidia_app
+    healthCheckPath: /
+    envVars:
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_MODEL
+        value: meta/llama-3.2-11b-vision-instruct
+      - key: NVIDIA_API_URL
+        value: https://integrate.api.nvidia.com/v1/chat/completions
+      - key: MAX_IMAGE_EDGE
+        value: "1280"

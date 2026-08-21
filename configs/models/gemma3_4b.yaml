@@ -12,9 +12,14 @@ model:
   base_id: unsloth/gemma-3-4b-it-unsloth-bnb-4bit
   min_free_vram_gb: 5.5
   image_max_pixels: null
+  # T4 使用訓練程式會覆寫為 True，避開 Unsloth 自訂 checkpoint 重算 SigLIP 時的 dtype bug。
+  use_gradient_checkpointing: true
   license_notice: >-
     基礎模型 Gemma 3 4B IT，使用受 Google Gemma Terms of Use 與
     Prohibited Use Policy 約束；再散布時必須一併傳遞這些使用限制。
 train:
-  # Gemma 3 在 fp16 下數值比較敏感，學習率保守一點
-  learning_rate: 1.0e-4
+  # 與已發布 adapter 的實際訓練設定一致。
+  learning_rate: 2.0e-4
+lora:
+  # T4 沒有 BF16；凍結 SigLIP 視覺編碼器可避開目前 Unsloth 視覺層反傳的 dtype bug。
+  finetune_vision_layers: false

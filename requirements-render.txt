@@ -1,0 +1,6 @@
+# Render 的 CPU-only 互動展示。不要安裝 torch / transformers / unsloth；
+# 推論由 NVIDIA API 執行，Render 只跑網頁與後端代理。
+gradio>=6,<7
+Pillow>=10
+requests>=2.32
+python-dotenv>=1.0

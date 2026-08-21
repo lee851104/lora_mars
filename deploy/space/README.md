@@ -8,7 +8,7 @@ sdk_version: 6.17.3
 app_file: app.py
 pinned: false
 license: other
-suggested_hardware: t4-small
+python_version: 3.10
 short_description: Gemma 3 4B + LoRA，天文影像描述，附微調前後對照
 ---
 
@@ -22,11 +22,15 @@ short_description: Gemma 3 4B + LoRA，天文影像描述，附微調前後對�
 
 | 項目 | 值 |
 |---|---|
-| Hardware | **T4 small 或更好**（4-bit 量化後約需 4.5 GB VRAM） |
+| Hardware | **ZeroGPU**（免費 demo）或 T4 small 以上（常駐、付費） |
 | Space variable | `LORA_REPO_ID` = `<user>/<adapter-repo>` |
 
-**免費的 CPU basic 硬體跑不動這個模型**，一定要換 GPU。ZeroGPU 可行但需要 PRO 訂閱，
-而且每次呼叫都要重新把 4.3 GB 權重搬上 GPU，第一次會很慢。
+**免費的 CPU basic 硬體跑不動這個模型**。個人免費帳號可用 **ZeroGPU**：帳號需通過
+email 驗證且建立超過 30 天，最多可建立兩個 ZeroGPU Space；每位免費使用者每日有 5 分鐘
+GPU 額度，可能排隊。第一次呼叫要下載並載入約 4.3 GB 基礎模型，會比較慢。
+
+ZeroGPU 適合課程展示與作品集，不適合多人長時間使用。需要穩定常駐時，改選 T4 small 或更好，
+但 GPU 時間會計費。
 
 `LORA_REPO_ID` 沒設的話，介面會明確標示「現在跑的是原廠模型」，不會假裝是微調結果。
 

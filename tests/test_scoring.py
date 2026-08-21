@@ -16,9 +16,14 @@ from src.models import clip_score, llm_judge, score
 
 
 # ── metric selection ────────────────────────────────────────────────────────
-def test_default_metrics_are_clipscore_and_judge(cfg):
-    assert list(cfg.eval.metrics) == ["clipscore", "llm_judge"]
-    assert score.resolve_metrics(cfg) == ["clipscore", "llm_judge"]
+def test_default_metrics_include_cider_clipscore_and_judge(cfg):
+    assert list(cfg.eval.metrics) == ["cider", "clipscore", "llm_judge"]
+    assert score.resolve_metrics(cfg) == ["cider", "clipscore", "llm_judge"]
+
+
+def test_cider_is_available_as_a_metric(cfg):
+    cfg.eval.metrics = ["cider"]
+    assert score.resolve_metrics(cfg) == ["cider"]
 
 
 def test_bleu_rouge_is_available_but_not_default(cfg):
@@ -41,6 +46,29 @@ def test_empty_metric_list_is_rejected(cfg):
 def test_missing_predictions_file_says_what_to_run(cfg):
     with pytest.raises(FileNotFoundError, match="make eval"):
         score.load_predictions(cfg, "test")
+
+
+def test_rescoring_preserves_metrics_already_in_the_report(cfg, monkeypatch):
+    rows = [{"prediction": "Mars", "reference": "Mars", "image_id": "1"}]
+    path = score.report_path(cfg, "test")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({
+            "split": "test",
+            "n_samples": 1,
+            "base_id": "example/base",
+            "metrics": {"clipscore": {"clipscore": 0.7}},
+        }),
+        encoding="utf-8",
+    )
+    cfg.eval.metrics = ["cider"]
+    monkeypatch.setattr(score, "run_cider", lambda _cfg, _rows: {"cider": 1.2})
+
+    report = score.score(cfg, rows, "test", merge_existing=True)
+
+    assert report["base_id"] == "example/base"
+    assert report["metrics"]["clipscore"]["clipscore"] == 0.7
+    assert report["metrics"]["cider"]["cider"] == 1.2
 
 
 def test_predictions_round_trip(cfg, tmp_path):

@@ -6,9 +6,12 @@
 預設基礎模型是 **Gemma 3 4B IT**（4-bit 只有 4.25 GiB、unsloth 鏡像不需申請核准）。
 換模型是改設定，不是改程式——見[換基礎模型](#換基礎模型)。
 
+- 已發布 LoRA adapter：[`lee851104/gemma3-4b-astronomy-lora`](https://huggingface.co/lee851104/gemma3-4b-astronomy-lora)
+- 線上 Demo：待訂閱 Hugging Face PRO 後部署 Gradio + ZeroGPU；目前沒有假連結
+
 ## 問題
 
-原始 notebook 流程能跑出 BLEU/ROUGE，但那組數字沒有意義，因為它同時犯了三個錯：
+原始 notebook 流程能跑出 BLEU/ROUGE，但那組數字沒有意義，因為它同時犯了四個錯：
 
 | # | 問題 | 後果 |
 |---|---|---|
@@ -17,7 +20,7 @@
 | 3 | `temperature=1.0` 但沒有 `do_sample=True` | 參數被 transformers 靜默忽略，實際是 greedy，看起來卻像在 sampling |
 | 4 | 只用 BLEU/ROUGE 當指標 | 那是字面重疊，量不到事實正確性——把星系名稱全講錯、句型一致的輸出可以拿高分 |
 
-本專案把這三個錯誤在**結構上**修掉，而不是靠註解提醒——切分是唯一入口且先於訓練、
+本專案把這四個錯誤在**結構上**修掉，而不是靠註解提醒——切分是唯一入口且先於訓練、
 decode 一定去掉 prompt、greedy 模式根本不會攜帶 sampling 參數。詳見
 [修了什麼](#修了什麼) 與 `tests/test_no_leakage.py`。
 
@@ -27,6 +30,7 @@ decode 一定去掉 prompt、greedy 模式根本不會攜帶 sampling 參數。�
 
 | 指標 | 意義 | Base | LoRA | 人類參考 |
 |---|---|---|---|---|
+| CIDEr | 與參考描述的共識（1--4 gram） | — | — | — |
 | CLIPScore | 圖文對齊（不看參考句） | — | — | — |
 | judge accuracy | 描述是否符合圖片，1–5 | — | — | n/a |
 | judge style_match | 是否像訓練語料的句型，1–5 | — | — | n/a |
@@ -42,11 +46,17 @@ decode 一定去掉 prompt、greedy 模式根本不會攜帶 sampling 參數。�
 
 ## Demo
 
+目前先採用 **Render + NVIDIA API** 的 CPU-only 互動展示：Render 只執行網頁與後端代理，
+實際視覺推論由 NVIDIA 託管的 `meta/llama-3.2-11b-vision-instruct` 執行。這個輸出**不是**
+本專案微調後的 Gemma 3 LoRA；頁面也會固定顯示這項差異。
+
 ```bash
-make serve
+$env:NVIDIA_API_KEY="<your-key>"   # PowerShell
+make serve-nvidia
 ```
 
-開 <http://localhost:7860>。介面可以**並排比較微調前後**——兩欄是同一個模型，
+開 <http://localhost:7860>。正式 LoRA 介面仍可在有 GPU 的環境執行 `make serve`；它能
+**並排比較微調前後**——兩欄是同一個模型，
 「原廠模型」那欄是在 `PeftModel.disable_adapter()` 裡跑的，所以不多吃顯存，
 看到的差異就是 LoRA 的效果。標頭永遠標示現在載入的是 base 還是 LoRA，
 避免把未微調的輸出誤認成微調結果。
@@ -69,7 +79,7 @@ flowchart LR
     ADP --> SERVE[make serve<br/>Gradio]
 
     GEN --> PRED[reports/<br/>predictions.jsonl]
-    PRED --> SCORE[make score<br/>CLIPScore + LLM-judge<br/>+ bootstrap CI]
+    PRED --> SCORE[make score<br/>CIDEr + CLIPScore + LLM-judge<br/>+ bootstrap CI]
     SCORE --> REP[reports/eval_test.json]
 
     style SPLITS fill:#e8f0fe,stroke:#4285f4
@@ -100,14 +110,14 @@ notebook 的每一步都是獨立子行程（`!python -m ...`），所以某一�
 ### 在自己的機器上
 
 ```bash
-uv sync --extra dev --extra clip --extra judge --extra serve
+uv sync --extra dev --extra clip --extra judge --extra eval --extra serve
 ```
 
-`clip` 是 CLIPScore（torch + transformers，CPU 也能跑），`judge` 是 LLM-as-judge
-（anthropic SDK）。GPU 機器（Colab / 有 CUDA）再加訓練堆疊：
+`clip` 是 CLIPScore（torch + transformers，CPU 也能跑），`eval` 是 CIDEr / BLEU /
+ROUGE，`judge` 是 LLM-as-judge（Anthropic SDK）。GPU 機器（Colab / 有 CUDA）再加訓練堆疊：
 
 ```bash
-uv sync --extra dev --extra clip --extra judge --extra serve --extra gpu
+uv sync --extra dev --extra clip --extra judge --extra eval --extra serve --extra gpu
 ```
 
 然後：
@@ -116,11 +126,12 @@ uv sync --extra dev --extra clip --extra judge --extra serve --extra gpu
 make data       # 下載資料集到 data/raw/
 make features   # 清洗 + 驗證 + 切分 -> data/processed/ 與 data/splits/
 make train      # LoRA 微調（只讀 train 切分）
-make eval       # 在 test 切分上產生預測並評分（CLIPScore + LLM-as-judge）
+make eval       # 在 test 切分上產生預測並評分（CIDEr + CLIPScore + LLM-as-judge）
 make score      # 只重算指標，不重新產生預測
 make serve      # Gradio
 make upload     # 把 models/lora/ 推到 Hugging Face
 make space      # 組出 build/space/，準備推到 Hugging Face Space
+make space-static-push  # 免費靜態專案頁；不執行模型
 ```
 
 Windows 沒有 `make` 的話，每個 target 就是一行 `uv run python -m ...`，直接看 `Makefile`。
@@ -162,8 +173,11 @@ make train MODEL=qwen2_vl_2b
 
 Gemma 3 用 bf16 訓練、activation 會超過 float16 上限（65504），而 T4 沒有 bf16 硬體。
 unsloth 對此有專門處理（activation 走 bf16/fp32、只有 matmul 降到 fp16、layernorm 升到
-fp32），所以可以跑，但這是四個預設裡最容易出現 `nan` loss 的。看到 nan：先確認 unsloth
-是最新版，再往下調 `train.learning_rate`（預設檔已先調到 1e-4）。
+fp32），所以可以跑，但這是四個預設裡最容易出現 `nan` loss 的。T4 的目前安全預設會凍結
+SigLIP 視覺編碼器，只訓練語言端 LoRA；這也能避開部分 Unsloth 版本在視覺層反向傳播出現的
+`expected scalar type BFloat16 but found Float`。同時改用 PyTorch 原生 gradient checkpointing
+（梯度檢查點）和 FP32 LayerNorm，會比 Unsloth checkpoint 稍慢。看到 `nan`：先確認 unsloth
+是最新版，再把 `train.learning_rate` 從本次使用的 `2e-4` 降到 `1e-4`。
 
 `MODEL=` 對應 `configs/models/<name>.yaml`。**同一次實驗的 `train` / `eval` / `serve`
 要用同一個 `MODEL`**，否則 adapter 對不上基礎模型會直接載入失敗。
@@ -174,7 +188,13 @@ vision token，在 T4 上必爆。`model.image_max_pixels` 預設夾到 768×768
 
 ## 指標
 
-預設兩個指標，都不看字面重疊：
+預設三個互補指標；沒有任何單一指標能代表模型「正確」：
+
+### CIDEr（有參考）
+
+CIDEr（Consensus-based Image Description Evaluation）以 TF-IDF 加權的 1--4 gram
+比較生成描述與人工參考句，是影像描述常用的自動指標。本資料每張影像只有一條參考描述，
+因此它是「文字共識」訊號，不能當作天文事實正確性的證據。
 
 ### CLIPScore（無參考）
 
@@ -220,7 +240,7 @@ make score OVERRIDE="llm_judge.cost_estimate_only=true"
 還在，但預設不開。留著是為了跟原始 notebook 和 captioning 文獻對照：
 
 ```bash
-make eval OVERRIDE="eval.metrics=[clipscore,llm_judge,bleu_rouge]"
+make eval OVERRIDE="eval.metrics=[cider,clipscore,llm_judge,bleu_rouge]"
 ```
 
 ### 產生與評分是分開的
@@ -262,16 +282,20 @@ make score      # 只重算，不重新生成
 ├── pyproject.toml           uv 管理依賴（gpu / eval / serve / dev 分組）
 ├── app.py                   Hugging Face Space 進入點（薄殼，實作在 src/serving/）
 ├── requirements.txt         Spaces 專用（Spaces 不讀 pyproject.toml）
+├── requirements-render.txt  Render CPU-only 互動展示依賴
+├── render.yaml              Render Blueprint（服務、啟動方式、環境變數）
 ├── configs/                 唯一的超參數來源
 │   └── models/              基礎模型預設（Gemma / Qwen / Llama）
 ├── deploy/space/README.md   Space 用的 README，含 HF frontmatter
+├── deploy/static-space/     免費 Static Space 的 HTML / CSS / README
+├── deploy/render/           Render + NVIDIA API 部署說明
 ├── src/
 │   ├── config.py            YAML 載入與 CLI 覆寫
 │   ├── data/                下載、驗證、建置、切分
 │   ├── features/            清洗與對話格式（純函式）
 │   ├── models/              載入、訓練、推論、評估、評分、權重上下載
-│   │                        clip_score / llm_judge / text_metrics / score
-│   └── serving/             Gradio
+│   │                        cider / clip_score / llm_judge / text_metrics / score
+│   └── serving/             GPU LoRA 介面 + Render/NVIDIA API 輕量介面
 ├── tests/                   含 test_no_leakage.py
 ├── notebooks/               colab_train.ipynb（完整流程）+ 01_eda.ipynb（EDA）
 ├── reports/figures/         所有圖表
@@ -283,7 +307,33 @@ make score      # 只重算，不重新生成
 
 ## 部署
 
-### 選項 A：Colab 臨時公開連結（免費，最快）
+### 選項 A：Render + NVIDIA API（目前方案）
+
+這個版本提供可上傳圖片、輸入問題的互動頁，但模型是 NVIDIA 託管的
+`meta/llama-3.2-11b-vision-instruct`，不是 Gemma 3 LoRA。好處是 Render 不需要 GPU，
+也不依賴 Colab runtime。
+
+1. 把本 repository 推到 GitHub。
+2. Render 選 **New → Blueprint**，連接 repository。
+3. Render 會讀根目錄 `render.yaml`；建立時把 NVIDIA Build 的金鑰填入 `NVIDIA_API_KEY`。
+4. 建立完成後使用 Render 提供的 `*.onrender.com` 網址。
+
+完整步驟見 [`deploy/render/README.md`](deploy/render/README.md)。金鑰只放 Render Secret，
+不能寫入 GitHub 或前端。Render 免費 Web Service 閒置後會休眠；NVIDIA Build API 也可能有
+試用額度與速率限制，因此這是作品展示方案，不是正式服務等級協議（Service-Level Agreement, SLA）。
+
+### 選項 B：Hugging Face Static Space（免費備用頁）
+
+先上線不含推論的專案頁：
+
+```bash
+make space-static-push OVERRIDE="space.repo_id=lee851104/astrovision-lora"
+```
+
+它會展示資料、訓練紀錄、adapter 與 GitHub 連結，不會使用 GPU。訂閱 PRO 後，對同一個
+`space.repo_id` 執行下方 Gradio 部署，即可把靜態頁換成互動式圖片描述介面。
+
+### 選項 C：Colab 臨時 LoRA 公開連結
 
 Colab 上跑：
 
@@ -291,9 +341,12 @@ Colab 上跑：
 make serve OVERRIDE="serving.share=true"
 ```
 
-會拿到一個 `*.gradio.live` 連結，72 小時內有效。上課 demo 用這個最省事。
+會拿到一個 `*.gradio.live` 臨時連結；Colab runtime 停止後連結就失效。
 
-### 選項 B：Hugging Face Space（長期）
+### 選項 D：Hugging Face Space（後續正式 LoRA Demo）
+
+目前狀態：adapter 已上傳；免費帳號建立 Gradio Space 時收到 HTTP 402。待訂閱
+Hugging Face PRO 後再執行本節，程式碼與權重不需要重新訓練。
 
 先把 adapter 上傳（Space 讀不到你本機或 Colab 上的 `models/lora/`）：
 
@@ -310,11 +363,11 @@ make space-push OVERRIDE="space.repo_id=<user>/<space-name>"
 `make space`（不加 `-push`）只組到 `build/space/`，讓你自己 git push。
 在 Colab 上用 `space-push`——不用把檔案抓回本機再推。
 
-推完還有**兩件事只能在 Space 網頁上做**：Settings → Hardware 選 T4 small 以上，
-Settings → Variables 加 `LORA_REPO_ID`。
+推完還有**兩件事只能在 Space 網頁上做**：Settings → Hardware 選 **ZeroGPU**（PRO 額度）
+或 T4 small 以上（付費常駐），Settings → Variables 加 `LORA_REPO_ID`。
 
-**硬體：免費的 CPU basic 跑不動 11B 模型**，一定要換成 T4 small 或更好。
-ZeroGPU 可行但需要 PRO，而且每次呼叫都要重新把 8 GB 權重搬上 GPU。
+**硬體：CPU basic 跑不動 Gemma 3 4B。** 後續訂閱 Hugging Face PRO 後可選 ZeroGPU，
+但會受每日 GPU 額度與排隊影響。需要穩定常駐時選 T4 small 或更好，GPU 時間另外計費。
 Space 建好後到 Settings → Variables 加 `LORA_REPO_ID`，沒設的話介面會標示現在跑的是 base 模型。
 
 ## 測試
@@ -326,6 +379,8 @@ make test
 CI 不裝 GPU 堆疊，所有測試都用合成資料在 CPU 上跑，不下載模型、不連網。
 
 ## 授權與出處
+
+本 repository 的程式碼採 [MIT License](LICENSE)。模型權重與資料不因此改變授權：
 
 預設基礎模型 `Gemma 3 4B IT` 使用受 Google Gemma Terms of Use 與 Prohibited Use
 Policy 約束，再散布時必須一併傳遞這些使用限制。切到 `qwen2_5_vl_7b` 是 Apache 2.0；

@@ -51,6 +51,39 @@ def test_default_model_is_ungated_and_unrestricted_by_region():
     assert "歐盟" not in notice, "the default must not carry a region restriction"
 
 
+def test_default_gemma_t4_preset_keeps_the_vision_encoder_frozen():
+    """T4 has no native BF16; this avoids Gemma 3 vision-backprop dtype conflicts."""
+    cfg = load_config()
+    assert cfg.model.base_id.startswith("unsloth/gemma-3-4b")
+    assert cfg.lora.finetune_vision_layers is False
+
+
+def test_train_runtime_guard_freezes_gemma_vision_lora_on_t4():
+    from src.models.train import apply_gemma_t4_safety
+
+    cfg = load_config()
+    cfg.lora.finetune_vision_layers = True
+    assert apply_gemma_t4_safety(cfg, has_cuda=True, supports_bf16=False) is True
+    assert cfg.lora.finetune_vision_layers is False
+    assert cfg.model.use_gradient_checkpointing is True
+
+
+def test_native_bf16_detection_uses_the_cuda_architecture_not_torch_emulation():
+    from src.models.train import supports_native_bf16
+
+    assert supports_native_bf16((7, 5)) is False  # Tesla T4
+    assert supports_native_bf16((8, 0)) is True   # A100
+
+
+def test_train_runtime_guard_preserves_vision_lora_on_bf16_gpu():
+    from src.models.train import apply_gemma_t4_safety
+
+    cfg = load_config()
+    cfg.lora.finetune_vision_layers = True
+    assert apply_gemma_t4_safety(cfg, has_cuda=True, supports_bf16=True) is False
+    assert cfg.lora.finetune_vision_layers is True
+
+
 def test_llama_preset_carries_the_required_attribution():
     cfg = load_config(override_file=PRESET_DIR / "llama3_2_11b_vision.yaml")
     assert "Built with Llama" in cfg.model.license_notice

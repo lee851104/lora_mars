@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,45 @@ from src.data.split import load_manifest, load_split
 from src.features.conversation import to_conversation
 
 TRAIN_SPLIT = "train"
+
+
+def supports_native_bf16(capability: tuple[int, int]) -> bool:
+    """Native CUDA BF16 tensor cores start at compute capability 8.0 (Ampere)."""
+    return capability[0] >= 8
+
+
+def apply_gemma_t4_safety(cfg: DictConfig, *, has_cuda: bool, supports_bf16: bool) -> bool:
+    """Avoid the Gemma 3 vision-backprop dtype path that fails on T4-class GPUs.
+
+    Gemma 3 checkpoints are BF16-native, but a Tesla T4 only has FP16 tensor
+    cores. Some Unsloth releases therefore fall back to FP32 and currently
+    hit a BF16/FP32 LayerNorm mismatch while backpropagating through SigLIP.
+    Freezing the vision tower still allows image-conditioned caption training:
+    the language-side LoRA learns from the image embeddings without sending a
+    gradient through SigLIP.
+
+    This is deliberately a runtime guard rather than documentation alone. A
+    user can safely use the default config on T4, while BF16-capable GPUs keep
+    the configured vision-LoRA setting.
+    """
+    is_gemma3 = "gemma-3" in str(cfg.model.base_id).lower()
+    wants_vision_lora = bool(cfg.lora.finetune_vision_layers)
+    if has_cuda and is_gemma3 and not supports_bf16:
+        if wants_vision_lora:
+            cfg.lora.finetune_vision_layers = False
+        # This needs to be set before FastVisionModel imports Unsloth, whose
+        # generated LayerNorm module reads it during compilation.
+        os.environ["UNSLOTH_HIGH_PRECISION_LAYERNORM"] = "1"
+        # "unsloth" uses Unsloth's asynchronous checkpointing. The current
+        # Gemma 3 / T4 path fails while that implementation recomputes SigLIP;
+        # native PyTorch checkpointing is slower but avoids that dtype path.
+        cfg.model.use_gradient_checkpointing = True
+        print(
+            "[train] Gemma 3 on a CUDA GPU without native BF16: using native "
+            "gradient checkpointing and FP32 LayerNorm; vision LoRA is frozen."
+        )
+        return True
+    return False
 
 
 def build_train_dataset(cfg: DictConfig, records: list[dict]) -> Any:
@@ -97,6 +137,17 @@ def main(cfg: DictConfig) -> dict[str, Any]:
     from src.models.loader import attach_lora, load_base, save_adapter
 
     ensure_dirs(cfg, "models_dir", "reports_dir", "outputs_dir")
+
+    has_cuda = torch.cuda.is_available()
+    # torch.cuda.is_bf16_supported() can report emulated BF16 support on a
+    # T4 with recent CUDA/PyTorch builds. Gemma needs native tensor-core BF16,
+    # so decide from the device architecture instead.
+    capability = torch.cuda.get_device_capability() if has_cuda else (0, 0)
+    apply_gemma_t4_safety(
+        cfg,
+        has_cuda=has_cuda,
+        supports_bf16=supports_native_bf16(capability),
+    )
 
     manifest = load_manifest(cfg)
     records = load_split(cfg, TRAIN_SPLIT)

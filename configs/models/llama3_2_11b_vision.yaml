@@ -9,3 +9,5 @@ model:
   license_notice: >-
     Built with Llama. 基礎模型 Meta Llama 3.2 11B Vision Instruct，使用受
     Llama 3.2 Community License 約束；其視覺功能在歐盟境內不得使用。
+lora:
+  finetune_vision_layers: true

@@ -59,15 +59,18 @@ lora:
   alpha: 16               # 經驗法則：alpha >= r
   dropout: 0.0
   bias: none
-  finetune_vision_layers: true
+  # Gemma 3 4B + T4（沒有原生 BF16）目前在 Unsloth 視覺層反向傳播有 dtype
+  # mismatch；預設凍結視覺編碼器，僅訓練語言端 LoRA，讓 T4 可穩定完成訓練。
+  # 使用支援 BF16 的 GPU，或已驗證修復的 Unsloth 版本時，才改成 true。
+  finetune_vision_layers: false
   finetune_language_layers: true
   finetune_attention_modules: true
   finetune_mlp_modules: true
   use_rslora: false
-  # ── 權重下載（後面填）────────────────────────────────────
-  # repo_id 填好後跑 `make weights`，會抓到 local_dir；
+  # ── 權重下載 ──────────────────────────────────────────────
+  # repo_id 已指向本次完成的公開 adapter；`make weights` 會抓到 local_dir；
   # 服務與評估都優先讀 local_dir，抓不到才退回 repo_id。
-  repo_id: null
+  repo_id: lee851104/gemma3-4b-astronomy-lora
   local_dir: models/lora
 
 upload:
@@ -105,10 +108,10 @@ eval:
   # 檔名會自動加 _base 後綴，不會蓋掉 LoRA 的報告。
   use_adapter: true
 
-  # 要算哪些指標。可選：clipscore / llm_judge / bleu_rouge
+  # 要算哪些指標。可選：cider / clipscore / llm_judge / bleu_rouge
   # BLEU/ROUGE 留著是為了跟原始 notebook 對照，但它們量不到事實正確性——
   # 一個把星系名稱全講錯、句型卻一致的輸出可以拿到很高的分數，所以不是預設。
-  metrics: [clipscore, llm_judge]
+  metrics: [cider, clipscore, llm_judge]
 
   bootstrap_samples: 1000
   bootstrap_seed: 0

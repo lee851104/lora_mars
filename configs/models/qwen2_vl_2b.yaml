@@ -8,3 +8,5 @@ model:
 train:
   per_device_train_batch_size: 4   # 模型小，塞得下
   gradient_accumulation_steps: 2   # 有效 batch 維持 8
+lora:
+  finetune_vision_layers: true

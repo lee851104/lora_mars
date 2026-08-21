@@ -9,7 +9,7 @@ the LLM judge exist to catch.
 They stay in the repo for one good reason: continuity with the original notebook
 and with the wider captioning literature. Turn them on with
 
-    make eval OVERRIDE="eval.metrics=[clipscore,llm_judge,bleu_rouge]"
+    make eval OVERRIDE="eval.metrics=[cider,clipscore,llm_judge,bleu_rouge]"
 """
 
 from __future__ import annotations
