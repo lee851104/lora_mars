@@ -8,7 +8,11 @@ def test_static_space_contains_only_static_assets(cfg, tmp_path: Path):
 
     assert (staged / "index.html").is_file()
     assert (staged / "style.css").is_file()
+    assert (staged / "app.js").is_file()
     assert "sdk: static" in (staged / "README.md").read_text(encoding="utf-8")
+    html = (staged / "index.html").read_text(encoding="utf-8")
+    assert "UI PREVIEW" in html
+    assert 'src="app.js"' in html
     assert not (staged / "app.py").exists()
     assert not (staged / "src").exists()
 

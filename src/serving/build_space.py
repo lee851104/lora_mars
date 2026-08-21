@@ -32,6 +32,7 @@ STATIC_FILES = (
     ("deploy/static-space/README.md", "README.md"),
     ("deploy/static-space/index.html", "index.html"),
     ("deploy/static-space/style.css", "style.css"),
+    ("deploy/static-space/app.js", "app.js"),
 )
 SKIP = {"__pycache__", ".pytest_cache", ".ruff_cache"}
 

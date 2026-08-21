@@ -3,57 +3,155 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Gemma 3 4B 天文影像描述 LoRA 專案展示">
-  <title>AstroVision LoRA</title>
+  <meta name="description" content="AstroVision LoRA 天文影像描述介面預覽">
+  <title>AstroVision LoRA · UI Preview</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <p class="eyebrow">GEMMA 3 4B · LORA · ASTRONOMY</p>
-      <h1>AstroVision LoRA</h1>
-      <p class="lead">以 250 組天文影像與描述微調視覺語言模型，建立可重現的訓練、評估與部署流程。</p>
-      <div class="actions">
-        <a class="primary" href="https://huggingface.co/lee851104/gemma3-4b-astronomy-lora">查看 LoRA 權重</a>
-        <a href="https://github.com/lee851104/lora_mars">查看 GitHub 原始碼</a>
+  <header class="nav shell">
+    <a class="brand" href="#top" aria-label="AstroVision 首頁">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>ASTROVISION</span>
+    </a>
+    <div class="nav-links">
+      <a href="#workflow">架構</a>
+      <a href="https://github.com/lee851104/lora_mars" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span class="mode-pill"><i></i> STATIC UI PREVIEW</span>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <p class="eyebrow">GEMMA 3 4B · LORA · ASTRONOMY</p>
+        <h1>讓天文影像<br><span>變成可讀描述</span></h1>
+        <p class="lead">
+          以 250 組天文影像微調的視覺語言模型專案，從固定資料切分、Colab T4 訓練，
+          到 CIDEr、CLIPScore 與 LLM-as-judge 評估。
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#demo">開啟介面預覽</a>
+          <a class="button secondary" href="https://huggingface.co/lee851104/gemma3-4b-astronomy-lora" target="_blank" rel="noopener noreferrer">查看 LoRA 權重</a>
+        </div>
+      </div>
+      <div class="orbit-card" aria-hidden="true">
+        <div class="orbit orbit-one"><i></i></div>
+        <div class="orbit orbit-two"><i></i></div>
+        <div class="planet"><span></span></div>
+        <div class="signal-card signal-a"><b>30</b><small>TRAIN STEPS</small></div>
+        <div class="signal-card signal-b"><b>0.69%</b><small>TRAINABLE</small></div>
       </div>
     </section>
 
-    <section class="grid" aria-label="專案摘要">
-      <article>
-        <span>資料</span>
-        <strong>250</strong>
-        <p>train / val / test = 200 / 25 / 25，測試集未參與訓練。</p>
-      </article>
-      <article>
-        <span>訓練</span>
-        <strong>30 steps</strong>
-        <p>Tesla T4，LoRA 可訓練參數 0.69%，約 6.36 分鐘。</p>
-      </article>
-      <article>
-        <span>模型</span>
-        <strong>Gemma 3 4B</strong>
-        <p>4-bit 基礎模型；T4 上凍結視覺編碼器，訓練語言端 LoRA。</p>
-      </article>
-    </section>
-
-    <section class="panel">
-      <div>
-        <p class="eyebrow">EVALUATION</p>
-        <h2>不只看 training loss</h2>
+    <section class="demo-section shell" id="demo">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">INTERFACE PREVIEW</p>
+          <h2>天文影像描述工作台</h2>
+        </div>
+        <div class="preview-warning"><span>UI PREVIEW</span> 不會送出圖片，也不執行模型推論</div>
       </div>
-      <p>專案使用 CIDEr、CLIPScore 與 LLM-as-judge，並比較 Base 與 LoRA 的 held-out test 結果。正式數字會在評估完成後公布，不以訓練 loss 冒充測試表現。</p>
-    </section>
 
-    <section class="notice">
-      <div class="pulse" aria-hidden="true"></div>
-      <div>
-        <h2>互動式 GPU Demo 準備中</h2>
-        <p>目前頁面為免費 Static Space，只展示專案。後續升級為 Gradio + ZeroGPU 後，將可上傳圖片並生成英文天文描述。</p>
+      <div class="workspace">
+        <section class="control-panel" aria-label="輸入區">
+          <div class="panel-topline">
+            <span>01 · IMAGE</span>
+            <button class="text-button" id="resetButton" type="button">Reset</button>
+          </div>
+
+          <label class="dropzone" id="dropzone" for="imageInput">
+            <input id="imageInput" type="file" accept="image/*">
+            <img id="imagePreview" alt="使用者選擇的圖片預覽">
+            <div class="sample-visual" id="sampleVisual" aria-hidden="true">
+              <div class="sample-moon"></div>
+              <div class="sample-horizon"></div>
+              <div class="sample-stars"></div>
+            </div>
+            <div class="drop-copy" id="dropCopy">
+              <span class="upload-icon">↑</span>
+              <strong>拖曳圖片或點擊選擇</strong>
+              <small>PNG / JPG · 圖片只在瀏覽器本機預覽</small>
+            </div>
+            <span class="image-label" id="imageLabel">SAMPLE · MARS SURFACE</span>
+          </label>
+
+          <div class="field-group">
+            <div class="panel-topline"><span>02 · PROMPT</span><small>建議使用英文</small></div>
+            <div class="preset-row" role="group" aria-label="提示詞預設">
+              <button class="preset active" type="button" data-prompt="accurate">Accurate</button>
+              <button class="preset" type="button" data-prompt="objects">Objects</button>
+              <button class="preset" type="button" data-prompt="cautious">Cautious</button>
+            </div>
+            <textarea id="promptInput" rows="4">Describe only what is visibly supported by this astronomy image. Do not invent mission names, locations, measurements, or dates.</textarea>
+          </div>
+
+          <button class="generate-button" id="generateButton" type="button">
+            <span>Generate preview</span>
+            <i aria-hidden="true">→</i>
+          </button>
+        </section>
+
+        <section class="result-panel" aria-label="輸出區">
+          <div class="result-header">
+            <div>
+              <p class="eyebrow">MODEL OUTPUT</p>
+              <h3>Generated caption</h3>
+            </div>
+            <span class="sample-badge"><i></i> SAMPLE OUTPUT</span>
+          </div>
+
+          <div class="model-line">
+            <span>MODEL</span>
+            <strong>Gemma 3 4B + Astronomy LoRA</strong>
+          </div>
+
+          <div class="output-box" id="outputBox" aria-live="polite">
+            <div class="loading-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+            <p id="outputText">A rust-toned planetary surface stretches toward a hazy horizon, with layered terrain and scattered rocky formations visible in the foreground.</p>
+          </div>
+
+          <div class="result-meta">
+            <div><span>MODE</span><strong>Preview only</strong></div>
+            <div><span>DECODE</span><strong>Greedy</strong></div>
+            <div><span>MAX TOKENS</span><strong>128</strong></div>
+          </div>
+
+          <div class="truth-note">
+            <span>!</span>
+            <p><strong>這不是即時 LoRA 結果。</strong> Static Space 沒有 GPU；按鈕只示範產品互動與輸出狀態。</p>
+          </div>
+        </section>
       </div>
     </section>
 
-    <footer>教學與作品集用途；模型輸出不能作為科學判讀依據。</footer>
+    <section class="stats shell" aria-label="專案數據">
+      <article><span>DATASET</span><strong>250</strong><p>天文影像與人工描述</p></article>
+      <article><span>SPLIT</span><strong>200 / 25 / 25</strong><p>Train / validation / test</p></article>
+      <article><span>TRAINING</span><strong>6.36 min</strong><p>Tesla T4 · 6.836 GB VRAM</p></article>
+      <article><span>ADAPTER</span><strong>119 MB</strong><p>29.8M trainable parameters</p></article>
+    </section>
+
+    <section class="workflow shell" id="workflow">
+      <div class="section-heading compact">
+        <div><p class="eyebrow">REPRODUCIBLE PIPELINE</p><h2>從資料到可驗證結果</h2></div>
+      </div>
+      <div class="flow-grid">
+        <article><b>01</b><h3>固定切分</h3><p>先建立 manifest，再讓訓練只讀 train，避免測試集洩漏。</p></article>
+        <article><b>02</b><h3>T4 LoRA</h3><p>4-bit Gemma 3 4B，只更新 0.69% 參數並保留訓練 metadata。</p></article>
+        <article><b>03</b><h3>公平比較</h3><p>同一批 held-out 圖片比較 Base 與 LoRA，不把 prompt 混進輸出。</p></article>
+        <article><b>04</b><h3>互補指標</h3><p>CIDEr、CLIPScore 與 LLM-as-judge 分別衡量文字共識、圖文對齊與幻覺。</p></article>
+      </div>
+    </section>
   </main>
+
+  <footer class="shell">
+    <div><strong>AstroVision LoRA</strong><span>教學與作品集用途，不能作為科學判讀依據。</span></div>
+    <div class="footer-links">
+      <a href="https://github.com/lee851104/lora_mars" target="_blank" rel="noopener noreferrer">Source</a>
+      <a href="https://huggingface.co/lee851104/gemma3-4b-astronomy-lora" target="_blank" rel="noopener noreferrer">Weights</a>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
