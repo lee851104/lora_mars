@@ -6,7 +6,9 @@
 #
 # Windows 沒有 make 的話，直接照著每個 target 底下的 uv 指令跑即可。
 
-PY      := uv run python
+# Colab 上用 `make train PY=python`，或直接跑 notebooks/colab_train.ipynb。
+# 不要在 Colab 上跑 uv sync —— 它會重裝 Colab 已經配好 CUDA 的 torch。
+PY      ?= uv run python
 CONFIG  ?= configs/config.yaml
 OVERRIDE ?=
 
@@ -17,12 +19,13 @@ MODEL   ?=
 MODEL_ARG := $(if $(MODEL),--override-file configs/models/$(MODEL).yaml,)
 ARGS    := --config $(CONFIG) $(MODEL_ARG) $(OVERRIDE)
 
-.PHONY: help setup setup-gpu data features train eval eval-base score serve weights upload space test lint fmt clean all
+.PHONY: help setup setup-gpu setup-colab data features train eval eval-base score serve weights upload space test lint fmt clean all
 .DEFAULT_GOAL := help
 
 help:
 	@echo "make setup     安裝依賴（CPU 基礎 + dev）"
-	@echo "make setup-gpu 安裝 GPU 訓練堆疊（Colab / 有 CUDA 的機器）"
+	@echo "make setup-gpu 安裝 GPU 訓練堆疊（自己的 CUDA 機器，用 uv）"
+	@echo "make setup-colab  Colab 專用安裝（不碰 torch）；之後每個指令加 PY=python"
 	@echo "make data      下載原始資料集到 data/raw/"
 	@echo "make features  清洗 + 驗證 + 切分 -> data/processed/ 與 data/splits/"
 	@echo "make train     LoRA 微調（只讀 train 切分）"
@@ -44,6 +47,18 @@ setup:
 
 setup-gpu:
 	uv sync --extra dev --extra clip --extra judge --extra serve --extra gpu
+
+# Colab 專用。刻意不碰 torch：Colab 預裝的 torch 已經跟它的 CUDA 對好了，
+# 重裝一次就會撞回 transformers/huggingface_hub 版本地獄。
+# unsloth 堆疊全部 --no-deps 安裝，transformers 最後釘（它會把 hub 拉回 <1.0）。
+setup-colab:
+	pip install -q --no-deps bitsandbytes accelerate peft trl triton cut_cross_entropy unsloth_zoo unsloth
+	pip install -q sentencepiece protobuf hf_transfer omegaconf "datasets>=3.4.1,!=4.0.*,!=4.1.0,<4.4.0"
+	pip install -q transformers==4.57.3
+	pip install -q anthropic
+	@echo ""
+	@echo "裝好了。往下跑請加 PY=python，例如：make data PY=python"
+	@python -c "import torch, transformers; print(f'torch {torch.__version__} | transformers {transformers.__version__} | cuda {torch.cuda.is_available()}')" 
 
 data:
 	$(PY) -m src.data.download $(ARGS)

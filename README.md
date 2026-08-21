@@ -85,6 +85,20 @@ flowchart LR
 
 ## 快速開始
 
+### 在 Colab 上（要 GPU 的步驟都在這裡跑）
+
+開 [`notebooks/colab_train.ipynb`](notebooks/colab_train.ipynb)，執行階段選 **T4 GPU**，
+從上往下跑完即可：clone → 安裝 → 資料 → 切分 → 訓練 → 評估 → 上傳權重。
+
+> **Colab 上不要跑 `uv sync`。** Colab 預裝的 torch 已經跟它的 CUDA 對好了，
+> 重裝會撞回 transformers / huggingface_hub 版本衝突。notebook 用的是
+> `make setup-colab`，刻意不碰 torch。
+
+notebook 的每一步都是獨立子行程（`!python -m ...`），所以某一步失敗時顯存會隨行程結束
+自動釋放——不會像單一 notebook 那樣，失敗的模型被 traceback 抓著不放、下一次執行直接 OOM。
+
+### 在自己的機器上
+
 ```bash
 uv sync --extra dev --extra clip --extra judge --extra serve
 ```
@@ -259,7 +273,7 @@ make score      # 只重算，不重新生成
 │   │                        clip_score / llm_judge / text_metrics / score
 │   └── serving/             Gradio
 ├── tests/                   含 test_no_leakage.py
-├── notebooks/               EDA 專用，不放訓練邏輯
+├── notebooks/               colab_train.ipynb（完整流程）+ 01_eda.ipynb（EDA）
 ├── reports/figures/         所有圖表
 └── .github/workflows/ci.yml lint + pytest（CPU-only）
 ```
