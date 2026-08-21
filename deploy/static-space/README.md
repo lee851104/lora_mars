@@ -4,6 +4,7 @@ emoji: 🔭
 colorFrom: indigo
 colorTo: purple
 sdk: static
+app_file: index.html
 pinned: false
 license: mit
 short_description: Gemma 3 4B 天文影像描述 LoRA｜可操作 UI Preview
