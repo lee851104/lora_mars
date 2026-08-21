@@ -19,7 +19,7 @@ MODEL   ?=
 MODEL_ARG := $(if $(MODEL),--override-file configs/models/$(MODEL).yaml,)
 ARGS    := --config $(CONFIG) $(MODEL_ARG) $(OVERRIDE)
 
-.PHONY: help setup setup-gpu setup-colab data features train eval eval-base score serve weights upload space test lint fmt clean all
+.PHONY: help setup setup-gpu setup-colab data features train eval eval-base score serve weights upload space space-push test lint fmt clean all
 .DEFAULT_GOAL := help
 
 help:
@@ -36,6 +36,7 @@ help:
 	@echo "make serve     啟動 Gradio 介面"
 	@echo "make upload    把 models/lora/ 推到 Hugging Face"
 	@echo "make space     組出 build/space/，準備推到 Hugging Face Space"
+	@echo "make space-push  組完直接推上去（Colab 上用這個）"
 	@echo "make test      跑測試（含 test_no_leakage.py）"
 	@echo "make all       data -> features -> train -> eval"
 	@echo ""
@@ -93,6 +94,10 @@ upload:
 
 space:
 	$(PY) -m src.serving.build_space $(ARGS)
+
+# 組完直接推上 Hugging Face Space（需要 HF_TOKEN，write 權限）
+space-push:
+	$(PY) -m src.serving.build_space $(ARGS) --push
 
 test:
 	uv run pytest

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from omegaconf import DictConfig
 
-from src.config import REPO_ROOT, config_from_args
+from src.config import REPO_ROOT, build_arg_parser, load_config
 
 # (source, destination) relative to the repo root / staging root
 FILES = (
@@ -79,5 +79,61 @@ def build_space(cfg: DictConfig, out_dir: Path | None = None) -> Path:
     return out_dir
 
 
+def push_space(cfg: DictConfig, staged: Path) -> str:
+    """Upload the staged folder straight to a Space.
+
+    Exists because the alternative - clone the Space, copy files in, git push -
+    needs a local machine with git credentials. Training happens in Colab, so
+    without this the deploy step would be the one thing you could not finish
+    there.
+    """
+    from huggingface_hub import HfApi
+
+    repo_id = cfg.space.get("repo_id")
+    if not repo_id:
+        raise ValueError(
+            "space.repo_id is not set. Pass\n"
+            '  make space-push OVERRIDE="space.repo_id=<user>/<space-name>"'
+        )
+
+    api = HfApi()
+    api.create_repo(
+        repo_id=str(repo_id),
+        repo_type="space",
+        space_sdk=str(cfg.space.sdk),
+        private=bool(cfg.space.private),
+        exist_ok=True,
+    )
+    api.upload_folder(
+        repo_id=str(repo_id),
+        repo_type="space",
+        folder_path=str(staged),
+        commit_message="deploy from build_space",
+    )
+
+    url = f"https://huggingface.co/spaces/{repo_id}"
+    print(f"\npushed: {url}")
+    print("\nStill to do in the Space UI (neither can be set from here):")
+    print("  1. Settings -> Hardware: pick T4 small or better.")
+    print("     CPU basic cannot load the model at all.")
+    print("  2. Settings -> Variables: LORA_REPO_ID = <user>/<adapter-repo>")
+    print("     Without it the Space serves the base model and says so.")
+    return url
+
+
+def main(argv: list[str] | None = None) -> Path:
+    parser = build_arg_parser("stage (and optionally push) a Hugging Face Space")
+    parser.add_argument(
+        "--push", action="store_true", help="upload the staged folder to space.repo_id"
+    )
+    args = parser.parse_args(argv)
+    cfg = load_config(args.config, args.override_file, args.overrides)
+
+    staged = build_space(cfg)
+    if args.push:
+        push_space(cfg, staged)
+    return staged
+
+
 if __name__ == "__main__":
-    build_space(config_from_args("stage a Hugging Face Space in build/space/"))
+    main()

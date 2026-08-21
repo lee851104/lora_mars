@@ -140,6 +140,13 @@ llm_judge:
   enable_fallbacks: true     # 遇到 refusal 時走伺服器端 fallback
   cost_estimate_only: false  # true = 只印預估花費，不真的呼叫 API
 
+space:
+  # `make space-push` 直接把 build/space/ 推到 Hugging Face Space。
+  # 在 Colab 上很有用——不用先把檔案抓回本機再 git push。
+  repo_id: null              # <user>/<space-name>
+  sdk: gradio
+  private: false
+
 serving:
   host: 0.0.0.0
   port: 7860

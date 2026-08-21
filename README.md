@@ -295,17 +295,23 @@ make serve OVERRIDE="serving.share=true"
 
 ### 選項 B：Hugging Face Space（長期）
 
-先把 adapter 上傳（Space 讀不到你本機的 `models/lora/`）：
+先把 adapter 上傳（Space 讀不到你本機或 Colab 上的 `models/lora/`）：
 
 ```bash
 make upload OVERRIDE="upload.repo_id=<user>/<adapter-repo>"
 ```
 
-再組出 Space 檔案並照著印出來的指示推上去：
+再組出 Space 檔案並直接推上去：
 
 ```bash
-make space
+make space-push OVERRIDE="space.repo_id=<user>/<space-name>"
 ```
+
+`make space`（不加 `-push`）只組到 `build/space/`，讓你自己 git push。
+在 Colab 上用 `space-push`——不用把檔案抓回本機再推。
+
+推完還有**兩件事只能在 Space 網頁上做**：Settings → Hardware 選 T4 small 以上，
+Settings → Variables 加 `LORA_REPO_ID`。
 
 **硬體：免費的 CPU basic 跑不動 11B 模型**，一定要換成 T4 small 或更好。
 ZeroGPU 可行但需要 PRO，而且每次呼叫都要重新把 8 GB 權重搬上 GPU。
